@@ -1030,17 +1030,6 @@ const App = () => {
           `}>
           {squares}
         </div>
-
-        {isFullscreen && (
-          <button
-            onClick={toggleFullscreen}
-            className="absolute top-4 right-4 p-2 
-                     bg-white/10 hover:bg-white/20 
-                     text-white rounded-lg
-                     transition-all duration-200">
-            <span className="text-2xl">×</span>
-          </button>
-        )}
       </div>
     );
   };
