@@ -752,12 +752,16 @@ const App = () => {
         const isBlack = (row + col) % 2 === 1;
         const piece = board[row][col];
 
-        let squareClass =
-          "aspect-square flex items-center justify-center relative";
+        let squareClass = `
+          aspect-square flex items-center justify-center relative 
+          transform transition-all duration-200
+          hover:shadow-inner cursor-pointer
+        `;
+
         if (isBlack) {
-          squareClass += " bg-gray-700";
+          squareClass += " bg-gradient-to-br from-gray-700 to-gray-800";
         } else {
-          squareClass += " bg-gray-300";
+          squareClass += " bg-gradient-to-br from-gray-200 to-gray-300";
         }
 
         if (
@@ -765,14 +769,16 @@ const App = () => {
           selectedPiece.row === row &&
           selectedPiece.col === col
         ) {
-          squareClass += " ring-2 ring-yellow-400";
+          squareClass += " ring-4 ring-yellow-400 shadow-lg scale-105";
         }
 
         const isValidMove = validMoves.some(
           (move) => move.row === row && move.col === col
         );
+
         if (isValidMove) {
-          squareClass += " bg-green-500 bg-opacity-70";
+          squareClass +=
+            " bg-gradient-to-br from-green-400 to-green-600 bg-opacity-70 animate-[validMove_1s_ease-in-out_infinite_alternate]";
         }
 
         squares.push(
@@ -797,25 +803,34 @@ const App = () => {
   const renderPiece = (piece) => {
     if (!piece) return null;
 
-    let pieceClass =
-      "w-full h-full rounded-full flex items-center justify-center";
+    let pieceClass = `
+      w-full h-full rounded-full 
+      flex items-center justify-center 
+      transform transition-all duration-200 
+      hover:scale-110 cursor-pointer 
+      shadow-lg hover:shadow-xl
+      animate-[pieceHover_0.2s_ease-in-out]
+    `;
+
     let imgSrc = null;
 
     switch (piece) {
       case PLAYER:
-        pieceClass += " bg-amber-300";
+        pieceClass += " bg-gradient-to-br from-amber-200 to-amber-400";
         imgSrc = beagleImg;
         break;
       case PLAYER_KING:
-        pieceClass += " bg-amber-300 border-2 border-yellow-500";
+        pieceClass +=
+          " bg-gradient-to-br from-amber-300 to-amber-500 ring-4 ring-yellow-400";
         imgSrc = beagleKingImg;
         break;
       case BOT:
-        pieceClass += " bg-orange-300";
+        pieceClass += " bg-gradient-to-br from-orange-200 to-orange-400";
         imgSrc = corgiImg;
         break;
       case BOT_KING:
-        pieceClass += " bg-orange-300 border-2 border-yellow-500";
+        pieceClass +=
+          " bg-gradient-to-br from-orange-300 to-orange-500 ring-4 ring-yellow-400";
         imgSrc = corgiKingImg;
         break;
       default:
@@ -827,24 +842,25 @@ const App = () => {
         <img
           src={imgSrc}
           alt={piece}
-          className="w-full h-full object-contain p-1"
+          className="w-[90%] h-[90%] object-contain p-1 drop-shadow-lg transform transition-transform duration-200"
+          draggable="false"
         />
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-gradient-to-b from-blue-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 overflow-x-hidden">
+    <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8 max-w-4xl mx-auto">
+        <div className="space-y-8 max-w-4xl mx-auto animate-[appear_0.5s_ease-out]">
           <div className="py-8">
             <div className="space-y-8">
-              <h1 className="text-4xl md:text-5xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+              <h1 className="text-4xl md:text-5xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 animate-[messageSlide_0.5s_ease-out]">
                 Корги против Биглей
               </h1>
 
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center">
-                <p className="text-xl md:text-2xl font-medium text-gray-800 dark:text-white">
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-lg p-6 text-center transform transition-all duration-200 hover:shadow-xl">
+                <p className="text-xl md:text-2xl font-medium text-gray-800 dark:text-white animate-[messageSlide_0.3s_ease-out]">
                   {gameMessage}
                 </p>
               </div>
