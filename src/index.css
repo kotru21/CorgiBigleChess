@@ -13,6 +13,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --gradient-from: rgb(59 130 246);
+  --gradient-via: rgb(147 51 234);
+  --gradient-to: rgb(59 130 246);
 }
 
 /* Добавим плавные переходы */
@@ -221,4 +225,26 @@ button:focus-visible {
 
 .spin-piece {
   animation: spin 1s linear infinite;
+}
+
+/* Оптимизируем анимации градиентов */
+.gradient-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.1),
+    rgba(147, 51, 234, 0.1),
+    rgba(59, 130, 246, 0.1)
+  );
+  background-size: 200% 100%;
+  animation: gradientMove 15s linear infinite;
+  will-change: background-position;
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }

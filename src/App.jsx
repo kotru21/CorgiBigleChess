@@ -103,6 +103,24 @@ const App = () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  // Добавляем слушатель для ориентации экрана
+  useEffect(() => {
+    const handleResize = () => {
+      if (isFullscreen) {
+        const board = document.getElementById("chess-board");
+        const size = Math.min(
+          window.innerHeight * 0.9,
+          window.innerWidth * 0.9
+        );
+        board.style.width = `${size}px`;
+        board.style.height = `${size}px`;
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isFullscreen]);
+
   // Check if any player has no valid moves left
   const checkGameStatus = () => {
     let botPieces = 0;
@@ -863,16 +881,42 @@ const App = () => {
     setJumpExists(false);
   };
 
-  // Добавьте функцию для переключения полноэкранного режима
+  // Обновляем функцию toggleFullscreen
   const toggleFullscreen = () => {
     if (!isFullscreen) {
       const board = document.getElementById("chess-board");
-      if (board.requestFullscreen) {
-        board.requestFullscreen();
+      try {
+        if (board.requestFullscreen) {
+          board.requestFullscreen();
+        } else if (board.webkitRequestFullscreen) {
+          board.webkitRequestFullscreen();
+        } else if (board.msRequestFullscreen) {
+          board.msRequestFullscreen();
+        }
+
+        // Блокируем прокрутку на мобильных
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.width = "100%";
+      } catch (err) {
+        console.error("Ошибка при переходе в полноэкранный режим:", err);
       }
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
+      try {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+
+        // Возвращаем прокрутку
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
+      } catch (err) {
+        console.error("Ошибка при выходе из полноэкранного режима:", err);
       }
     }
     setIsFullscreen(!isFullscreen);
@@ -935,19 +979,37 @@ const App = () => {
     }
 
     let boardClass = `
-      grid grid-cols-8 border-2 border-black aspect-square 
-      ${isFullscreen ? "h-[90vh]" : "max-w-[600px] w-full"} 
+      grid grid-cols-8 border-2 border-black
+      ${
+        isFullscreen
+          ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
+          : "max-w-[600px] w-full aspect-square"
+      }
       ${gameMode === GAME_MODES.PARTY_MODE ? "party-board" : ""}
     `;
 
     let containerClass = `
       flex items-center justify-center w-full h-full
-      ${isFullscreen ? "fixed inset-0 bg-gray-900/90 backdrop-blur-md" : ""}
+      ${
+        isFullscreen
+          ? "fixed inset-0 bg-gray-900/90 backdrop-blur-md overscroll-none"
+          : ""
+      }
     `;
 
     return (
       <div className={containerClass}>
         <div className={boardClass}>{squares}</div>
+        {isFullscreen && (
+          <button
+            onClick={toggleFullscreen}
+            className="absolute top-4 right-4 px-4 py-2 bg-gray-800/80 
+                     hover:bg-gray-700/80 text-white rounded-lg shadow-lg 
+                     backdrop-blur-sm z-50 touch-none">
+            <span>🔄</span>
+            <span className="hidden md:inline ml-2">Выйти</span>
+          </button>
+        )}
       </div>
     );
   };
