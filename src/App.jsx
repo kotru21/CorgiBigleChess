@@ -95,7 +95,17 @@ const App = () => {
   // Добавьте слушатель событий для изменения полноэкранного режима
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFS = !!document.fullscreenElement;
+      setIsFullscreen(isFS);
+
+      if (!isFS) {
+        // Восстанавливаем стили только при выходе
+        document.body.style.overflow = "";
+        const board = document.getElementById("chess-board");
+        if (board) {
+          board.style = "";
+        }
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -881,28 +891,20 @@ const App = () => {
     setJumpExists(false);
   };
 
-  // Обновим toggleFullscreen
+  // Упрощенный toggleFullscreen
   const toggleFullscreen = () => {
-    if (!isFullscreen) {
-      const board = document.getElementById("chess-board");
+    const board = document.getElementById("chess-board-container");
+
+    if (!isFullscreen && board) {
       try {
         if (board.requestFullscreen) {
           board.requestFullscreen();
         } else if (board.webkitRequestFullscreen) {
           board.webkitRequestFullscreen();
-        } else if (board.msRequestFullscreen) {
-          board.msRequestFullscreen();
         }
-
-        // Применяем стили для полноэкранного режима
-        document.body.style.overflow = "hidden";
-        document.documentElement.style.overflow = "hidden";
-        board.style.width = "100vmin";
-        board.style.height = "100vmin";
-        board.style.maxWidth = "100vh";
-        board.style.maxHeight = "100vh";
+        setIsFullscreen(true);
       } catch (err) {
-        console.error("Ошибка при переходе в полноэкранный режим:", err);
+        console.error("Ошибка перехода в полноэкранный режим:", err);
       }
     } else {
       try {
@@ -910,28 +912,15 @@ const App = () => {
           document.exitFullscreen();
         } else if (document.webkitExitFullscreen) {
           document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-          document.msExitFullscreen();
         }
-
-        // Восстанавливаем стили после выхода
-        setTimeout(() => {
-          document.body.style.overflow = "";
-          document.documentElement.style.overflow = "";
-          const board = document.getElementById("chess-board");
-          board.style.width = "";
-          board.style.height = "";
-          board.style.maxWidth = "";
-          board.style.maxHeight = "";
-        }, 100);
+        setIsFullscreen(false);
       } catch (err) {
-        console.error("Ошибка при выходе из полноэкранного режима:", err);
+        console.error("Ошибка выхода из полноэкранного режима:", err);
       }
     }
-    setIsFullscreen(!isFullscreen);
   };
 
-  // Обновим renderBoard для улучшенной поддержки полноэкранного режима
+  // Обновленный renderBoard
   const renderBoard = () => {
     const squares = [];
 
@@ -987,37 +976,62 @@ const App = () => {
       }
     }
 
+    // Упрощаем классы для мобильных устройств
     let boardClass = `
       grid grid-cols-8 border-2 border-black 
-      transition-all duration-300 ease-in-out
+      transition-transform duration-300
       ${
         isFullscreen
-          ? "w-[100vmin] h-[100vmin] max-w-[100vh] max-h-[100vh]"
+          ? "fixed inset-0 w-screen h-screen"
           : "w-full max-w-[600px] aspect-square"
       }
-      ${gameMode === GAME_MODES.PARTY_MODE ? "party-board" : ""}
     `;
 
+    // Убираем тяжелые градиенты для мобильных
     let containerClass = `
       flex items-center justify-center w-full h-full
-      transition-all duration-300 ease-in-out
-      ${isFullscreen ? "fixed inset-0 bg-black/90 backdrop-blur-md z-50" : ""}
+      ${isFullscreen ? "fixed inset-0 bg-black z-50" : ""}
     `;
 
+    // Оптимизируем стили квадратов для мобильных
+    const getSquareClass = (isBlack) => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        return isBlack ? "bg-gray-700" : "bg-gray-300";
+      }
+      return isBlack
+        ? "bg-gradient-to-br from-gray-700 to-gray-800"
+        : "bg-gradient-to-br from-gray-200 to-gray-300";
+    };
+
     return (
-      <div className={containerClass}>
-        <div id="chess-board" className={boardClass}>
+      <div
+        id="chess-board-container"
+        className={`
+          relative flex items-center justify-center
+          ${
+            isFullscreen ? "fixed inset-0 bg-black w-screen h-screen" : "w-full"
+          }
+        `}>
+        <div
+          id="chess-board"
+          className={`
+            grid grid-cols-8 border-2 border-black
+            ${
+              isFullscreen
+                ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
+                : "w-full max-w-[600px] aspect-square"
+            }
+          `}>
           {squares}
         </div>
+
         {isFullscreen && (
           <button
             onClick={toggleFullscreen}
-            className="absolute top-4 right-4 px-4 py-2 bg-white/10 
-                     hover:bg-white/20 text-white rounded-lg shadow-lg 
-                     backdrop-blur-sm transition-all duration-200
-                     hover:scale-105 z-50">
-            <span className="text-xl">🔄</span>
-            <span className="ml-2 hidden sm:inline">Выйти</span>
+            className="absolute top-4 right-4 p-2 bg-white/10 
+                     hover:bg-white/20 text-white rounded-lg">
+            <span className="text-2xl">×</span>
           </button>
         )}
       </div>
@@ -1158,9 +1172,23 @@ const App = () => {
     </div>
   );
 
+  // Оптимизируем стили для мобильных устройств
+  const mainContainerClass = `
+    flex flex-col items-center justify-center min-h-screen w-screen
+    ${
+      window.innerWidth < 768
+        ? "bg-gray-100 dark:bg-gray-900"
+        : "bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
+    }
+  `;
+
   // Обновляем разметку в основном return
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div
+      className={`
+      flex flex-col items-center justify-center min-h-screen w-screen
+      ${isFullscreen ? "" : "p-4"}
+    `}>
       {showModeSelect && renderModeSelect()}
 
       <div className="container mx-auto px-4 py-8">
