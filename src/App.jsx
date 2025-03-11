@@ -1167,7 +1167,7 @@ const App = () => {
       flex flex-col items-center justify-center min-h-screen w-screen
      bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900
       transition-colors duration-300
-      ${isFullscreen ? "" : "p-4"}
+      
     `}>
       {showModeSelect && renderModeSelect()}
 
