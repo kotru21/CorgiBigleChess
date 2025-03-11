@@ -1121,9 +1121,9 @@ const App = () => {
               </div>
 
               {/* Сообщение о состоянии игры */}
-              <div className="mt-6 text-center">
+              <div className="mt-6 text-center min-h-16">
                 <p
-                  className="text-xl font-semibold animate-[messageSlide_0.5s_ease-out] 
+                  className="text-xl font-semibold animate-[messageSlide_0.5s_ease-out]  
                            bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
                   {gameMessage}
                 </p>
