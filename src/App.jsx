@@ -942,7 +942,7 @@ const App = () => {
 
     let containerClass = `
       flex items-center justify-center w-full h-full
-      ${isFullscreen ? "fixed inset-0 bg-gray-900/90 backdrop-blur-sm" : ""}
+      ${isFullscreen ? "fixed inset-0 bg-gray-900/90 backdrop-blur-md" : ""}
     `;
 
     return (
@@ -1088,7 +1088,7 @@ const App = () => {
 
   // Обновляем разметку в основном return
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {showModeSelect && renderModeSelect()}
 
       <div className="container mx-auto px-4 py-8">
