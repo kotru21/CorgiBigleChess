@@ -881,7 +881,7 @@ const App = () => {
     setJumpExists(false);
   };
 
-  // Обновляем функцию toggleFullscreen
+  // Обновим toggleFullscreen
   const toggleFullscreen = () => {
     if (!isFullscreen) {
       const board = document.getElementById("chess-board");
@@ -894,10 +894,13 @@ const App = () => {
           board.msRequestFullscreen();
         }
 
-        // Блокируем прокрутку на мобильных
+        // Применяем стили для полноэкранного режима
         document.body.style.overflow = "hidden";
-        document.body.style.position = "fixed";
-        document.body.style.width = "100%";
+        document.documentElement.style.overflow = "hidden";
+        board.style.width = "100vmin";
+        board.style.height = "100vmin";
+        board.style.maxWidth = "100vh";
+        board.style.maxHeight = "100vh";
       } catch (err) {
         console.error("Ошибка при переходе в полноэкранный режим:", err);
       }
@@ -911,10 +914,16 @@ const App = () => {
           document.msExitFullscreen();
         }
 
-        // Возвращаем прокрутку
-        document.body.style.overflow = "";
-        document.body.style.position = "";
-        document.body.style.width = "";
+        // Восстанавливаем стили после выхода
+        setTimeout(() => {
+          document.body.style.overflow = "";
+          document.documentElement.style.overflow = "";
+          const board = document.getElementById("chess-board");
+          board.style.width = "";
+          board.style.height = "";
+          board.style.maxWidth = "";
+          board.style.maxHeight = "";
+        }, 100);
       } catch (err) {
         console.error("Ошибка при выходе из полноэкранного режима:", err);
       }
@@ -922,7 +931,7 @@ const App = () => {
     setIsFullscreen(!isFullscreen);
   };
 
-  // Обновляем renderBoard для полноэкранного режима
+  // Обновим renderBoard для улучшенной поддержки полноэкранного режима
   const renderBoard = () => {
     const squares = [];
 
@@ -979,35 +988,36 @@ const App = () => {
     }
 
     let boardClass = `
-      grid grid-cols-8 border-2 border-black
+      grid grid-cols-8 border-2 border-black 
+      transition-all duration-300 ease-in-out
       ${
         isFullscreen
-          ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
-          : "max-w-[600px] w-full aspect-square"
+          ? "w-[100vmin] h-[100vmin] max-w-[100vh] max-h-[100vh]"
+          : "w-full max-w-[600px] aspect-square"
       }
       ${gameMode === GAME_MODES.PARTY_MODE ? "party-board" : ""}
     `;
 
     let containerClass = `
       flex items-center justify-center w-full h-full
-      ${
-        isFullscreen
-          ? "fixed inset-0 bg-gray-900/90 backdrop-blur-md overscroll-none"
-          : ""
-      }
+      transition-all duration-300 ease-in-out
+      ${isFullscreen ? "fixed inset-0 bg-black/90 backdrop-blur-md z-50" : ""}
     `;
 
     return (
       <div className={containerClass}>
-        <div className={boardClass}>{squares}</div>
+        <div id="chess-board" className={boardClass}>
+          {squares}
+        </div>
         {isFullscreen && (
           <button
             onClick={toggleFullscreen}
-            className="absolute top-4 right-4 px-4 py-2 bg-gray-800/80 
-                     hover:bg-gray-700/80 text-white rounded-lg shadow-lg 
-                     backdrop-blur-sm z-50 touch-none">
-            <span>🔄</span>
-            <span className="hidden md:inline ml-2">Выйти</span>
+            className="absolute top-4 right-4 px-4 py-2 bg-white/10 
+                     hover:bg-white/20 text-white rounded-lg shadow-lg 
+                     backdrop-blur-sm transition-all duration-200
+                     hover:scale-105 z-50">
+            <span className="text-xl">🔄</span>
+            <span className="ml-2 hidden sm:inline">Выйти</span>
           </button>
         )}
       </div>
