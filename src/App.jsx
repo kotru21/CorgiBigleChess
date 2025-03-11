@@ -182,6 +182,30 @@ const App = () => {
         });
 
       case GAME_MODES.PARTY_MODE:
+        // Добавляем случайные модификации к ходам
+        return moves.map((move) => {
+          if (Math.random() > 0.7) {
+            // 30% шанс сумасшедшего хода
+            const crazyMove = { ...move };
+            // Случайное смещение в пределах доски
+            crazyMove.row = Math.max(
+              0,
+              Math.min(
+                BOARD_SIZE - 1,
+                move.row + Math.floor(Math.random() * 3) - 1
+              )
+            );
+            crazyMove.col = Math.max(
+              0,
+              Math.min(
+                BOARD_SIZE - 1,
+                move.col + Math.floor(Math.random() * 3) - 1
+              )
+            );
+            return crazyMove;
+          }
+          return move;
+        });
         document.querySelectorAll(".piece").forEach((piece) => {
           piece.classList.add("spin-piece");
         });
@@ -370,6 +394,28 @@ const App = () => {
           setGameMessage("Доступен множественный прыжок! Продолжайте прыгать.");
           return;
         }
+      }
+    }
+
+    if (gameMode === GAME_MODES.PARTY_MODE) {
+      // Добавляем случайные эффекты при ходах
+      const effects = [
+        "scale-150",
+        "rotate-180",
+        "skew-x-12",
+        "blur-sm",
+        "brightness-150",
+        "contrast-200",
+      ];
+      const randomEffect = effects[Math.floor(Math.random() * effects.length)];
+
+      // Применяем эффект к фигуре
+      const piece = document.querySelector(
+        `[data-row="${toRow}"][data-col="${toCol}"]`
+      );
+      if (piece) {
+        piece.classList.add(randomEffect);
+        setTimeout(() => piece.classList.remove(randomEffect), 500);
       }
     }
 
@@ -832,7 +878,7 @@ const App = () => {
     setIsFullscreen(!isFullscreen);
   };
 
-  // Render the board
+  // Обновляем renderBoard для полноэкранного режима
   const renderBoard = () => {
     const squares = [];
 
@@ -845,12 +891,19 @@ const App = () => {
           aspect-square flex items-center justify-center relative 
           transform transition-all duration-200
           hover:shadow-inner cursor-pointer
+          ${gameMode === GAME_MODES.PARTY_MODE ? "party-square" : ""}
         `;
 
         if (isBlack) {
-          squareClass += " bg-gradient-to-br from-gray-700 to-gray-800";
+          squareClass +=
+            gameMode === GAME_MODES.PARTY_MODE
+              ? ` bg-gradient-to-br from-${getRandomColor()} to-${getRandomColor()}`
+              : " bg-gradient-to-br from-gray-700 to-gray-800";
         } else {
-          squareClass += " bg-gradient-to-br from-gray-200 to-gray-300";
+          squareClass +=
+            gameMode === GAME_MODES.PARTY_MODE
+              ? ` bg-gradient-to-br from-${getRandomColor()} to-${getRandomColor()}`
+              : " bg-gradient-to-br from-gray-200 to-gray-300";
         }
 
         if (
@@ -881,11 +934,37 @@ const App = () => {
       }
     }
 
+    let boardClass = `
+      grid grid-cols-8 border-2 border-black aspect-square 
+      ${isFullscreen ? "h-[90vh]" : "max-w-[600px] w-full"} 
+      ${gameMode === GAME_MODES.PARTY_MODE ? "party-board" : ""}
+    `;
+
+    let containerClass = `
+      flex items-center justify-center w-full h-full
+      ${isFullscreen ? "fixed inset-0 bg-gray-900/90 backdrop-blur-sm" : ""}
+    `;
+
     return (
-      <div className="grid grid-cols-8 border-2 border-black w-full max-w-[600px] aspect-square">
-        {squares}
+      <div className={containerClass}>
+        <div className={boardClass}>{squares}</div>
       </div>
     );
+  };
+
+  // Добавим функцию для генерации случайных цветов
+  const getRandomColor = () => {
+    const colors = [
+      "red",
+      "blue",
+      "green",
+      "yellow",
+      "purple",
+      "pink",
+      "orange",
+      "teal",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
   };
 
   // Render a piece
@@ -900,8 +979,14 @@ const App = () => {
       hover:scale-110 cursor-pointer 
       shadow-lg hover:shadow-xl
       animate-[pieceHover_0.2s_ease-in-out]
-      ${gameMode === GAME_MODES.PARTY_MODE ? "party-mode" : ""} 
     `;
+
+    if (gameMode === GAME_MODES.PARTY_MODE) {
+      pieceClass += " party-mode";
+      // Добавляем случайную задержку анимации для каждой фигуры
+      const delay = Math.random() * 2;
+      pieceClass += ` animate-delay-${Math.floor(delay)}`;
+    }
 
     let imgSrc = null;
 
@@ -1001,68 +1086,130 @@ const App = () => {
     </div>
   );
 
-  // Модифицируем return для исправления кнопки выбора режима
+  // Обновляем разметку в основном return
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {showModeSelect && renderModeSelect()}
 
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-8 max-w-4xl mx-auto">
-          <div className="flex justify-between items-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600">
-              Корги против Биглей
-            </h1>
-            <button
-              onClick={() => setShowModeSelect(true)}
-              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
-                       text-white rounded-lg shadow-lg transform transition-all 
-                       duration-200 hover:scale-105 flex items-center space-x-2">
-              <span>🎮</span>
-              <span>Режим игры</span>
-            </button>
-          </div>
+          {!isFullscreen && (
+            /* Верхняя панель */
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 shadow-xl">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600">
+                  Корги против Биглей
+                </h1>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowModeSelect(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
+                             text-white rounded-lg shadow-lg transform transition-all 
+                             duration-200 hover:scale-105 flex items-center gap-2">
+                    <span>🎮</span>
+                    <span>Режим игры</span>
+                  </button>
+                  <button
+                    onClick={toggleFullscreen}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 
+                             text-white rounded-lg shadow-lg transform transition-all 
+                             duration-200 hover:scale-105 flex items-center gap-2">
+                    <span>{isFullscreen ? "🔄" : "📺"}</span>
+                    <span>{isFullscreen ? "Выйти" : "На весь экран"}</span>
+                  </button>
+                </div>
+              </div>
 
-          <div className="text-center mb-4">
-            <p className="text-xl font-semibold animate-[messageSlide_0.5s_ease-out]">
-              {gameMessage}
-            </p>
-          </div>
-
-          <div id="chess-board" className="mx-auto">
-            {renderBoard()}
-          </div>
-
-          {gameOver && (
-            <button
-              onClick={restartGame}
-              className="mt-4 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 
-                       text-white rounded-xl shadow-lg transform transition-all 
-                       duration-200 hover:scale-105">
-              Начать новую игру
-            </button>
-          )}
-
-          <div className="mt-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
-                Как играть:
-              </h2>
-              <div className="space-y-4">
-                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                  1. Нажмите на вашего Бигля, чтобы выбрать его
-                </p>
-                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                  2. Нажмите на подсвеченную клетку для хода
-                </p>
-                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                  3. Вы должны прыгать, если прыжок доступен
-                </p>
-                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                  4. Короли могут ходить вперёд и назад
+              {/* Сообщение о состоянии игры */}
+              <div className="mt-6 text-center">
+                <p
+                  className="text-xl font-semibold animate-[messageSlide_0.5s_ease-out] 
+                           bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
+                  {gameMessage}
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Игровая доска с рамкой */}
+          <div className="relative group">
+            <div
+              className={`
+              absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 
+              rounded-xl blur opacity-50 group-hover:opacity-75 transition duration-1000
+              ${isFullscreen ? "hidden" : ""}
+            `}></div>
+            <div
+              id="chess-board"
+              className={`
+              relative rounded-xl shadow-xl overflow-hidden
+              ${isFullscreen ? "" : "bg-white dark:bg-gray-800 p-4"}
+            `}>
+              {renderBoard()}
+              {/* Кнопка выхода из полноэкранного режима */}
+              {isFullscreen && (
+                <button
+                  onClick={toggleFullscreen}
+                  className="absolute top-4 right-4 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 
+                           text-white rounded-lg shadow-lg backdrop-blur-sm
+                           transform transition-all duration-200 hover:scale-105
+                           flex items-center space-x-2 z-50">
+                  <span>🔄</span>
+                  <span>Выйти</span>
+                </button>
+              )}
+            </div>
           </div>
+
+          {!isFullscreen && (
+            <>
+              {/* Кнопка "Играть снова" */}
+              {gameOver && (
+                <div className="text-center">
+                  <button
+                    onClick={restartGame}
+                    className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 
+                             text-white text-xl font-semibold rounded-xl shadow-xl 
+                             transform transition-all duration-200 hover:scale-105 
+                             hover:shadow-2xl focus:outline-none focus:ring-2 
+                             focus:ring-offset-2 focus:ring-green-500">
+                    Начать новую игру
+                  </button>
+                </div>
+              )}
+
+              {/* Инструкции */}
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl p-8">
+                <h2
+                  className="text-2xl font-bold mb-6 text-center bg-gradient-to-r 
+                             from-blue-600 to-purple-600 text-transparent bg-clip-text">
+                  Как играть:
+                </h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 text-lg">
+                      <span className="text-2xl">👆</span>
+                      <p>Нажмите на вашего Бигля, чтобы выбрать его</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-lg">
+                      <span className="text-2xl">🎯</span>
+                      <p>Нажмите на подсвеченную клетку для хода</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 text-lg">
+                      <span className="text-2xl">🦘</span>
+                      <p>Вы должны прыгать, если прыжок доступен</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-lg">
+                      <span className="text-2xl">👑</span>
+                      <p>Короли могут ходить вперёд и назад</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

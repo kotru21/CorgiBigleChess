@@ -133,8 +133,6 @@ button:focus-visible {
   }
 }
 
-/* ...existing code... */
-
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -151,6 +149,70 @@ button:focus-visible {
   100% {
     filter: hue-rotate(360deg);
   }
+}
+
+/* Добавляем новые анимации для режима вечеринки */
+@keyframes crazyRotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.2);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.8);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes discoLight {
+  0% {
+    filter: hue-rotate(0deg) brightness(100%);
+  }
+  25% {
+    filter: hue-rotate(90deg) brightness(150%);
+  }
+  50% {
+    filter: hue-rotate(180deg) brightness(100%);
+  }
+  75% {
+    filter: hue-rotate(270deg) brightness(150%);
+  }
+  100% {
+    filter: hue-rotate(360deg) brightness(100%);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.party-mode {
+  animation: crazyRotate 2s linear infinite, discoLight 1s linear infinite;
+}
+
+.party-board {
+  animation: discoLight 3s linear infinite;
+}
+
+.party-square {
+  transition: all 0.3s ease;
+}
+
+.party-square:hover {
+  transform: scale(1.1) rotate(15deg);
+  z-index: 10;
 }
 
 .party-mode {
