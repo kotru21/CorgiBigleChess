@@ -1010,8 +1010,11 @@ const App = () => {
         className={`
           relative flex items-center justify-center
           ${
-            isFullscreen ? "fixed inset-0 bg-black w-screen h-screen" : "w-full"
+            isFullscreen
+              ? "fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 w-screen h-screen"
+              : "w-full"
           }
+          transition-colors duration-300
         `}>
         <div
           id="chess-board"
@@ -1022,6 +1025,8 @@ const App = () => {
                 ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
                 : "w-full max-w-[600px] aspect-square"
             }
+            shadow-2xl
+            transition-all duration-300
           `}>
           {squares}
         </div>
@@ -1029,8 +1034,10 @@ const App = () => {
         {isFullscreen && (
           <button
             onClick={toggleFullscreen}
-            className="absolute top-4 right-4 p-2 bg-white/10 
-                     hover:bg-white/20 text-white rounded-lg">
+            className="absolute top-4 right-4 p-2 
+                     bg-white/10 hover:bg-white/20 
+                     text-white rounded-lg
+                     transition-all duration-200">
             <span className="text-2xl">×</span>
           </button>
         )}
@@ -1187,6 +1194,8 @@ const App = () => {
     <div
       className={`
       flex flex-col items-center justify-center min-h-screen w-screen
+     bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900
+      transition-colors duration-300
       ${isFullscreen ? "" : "p-4"}
     `}>
       {showModeSelect && renderModeSelect()}
