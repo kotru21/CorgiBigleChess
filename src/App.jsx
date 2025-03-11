@@ -1078,11 +1078,11 @@ const App = () => {
     }
 
     return (
-      <div className={pieceClass}>
+      <div className={`${pieceClass} overflow-clip`}>
         <img
           src={imgSrc}
           alt={piece}
-          className="w-[90%] h-[90%] object-contain p-1 drop-shadow-lg transform transition-transform duration-200"
+          className="w-[100%] h-[100%] object-cover drop-shadow-lg transform transition-transform duration-200"
           draggable="false"
         />
       </div>
