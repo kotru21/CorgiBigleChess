@@ -132,3 +132,31 @@ button:focus-visible {
     color: rgba(255, 255, 255, 0.87);
   }
 }
+
+/* ...existing code... */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes party {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.party-mode {
+  animation: party 2s linear infinite;
+}
+
+.spin-piece {
+  animation: spin 1s linear infinite;
+}

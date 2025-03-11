@@ -12,6 +12,14 @@ const PLAYER_KING = "beagle-king";
 const BOT_KING = "corgi-king";
 const EMPTY = null;
 
+// Добавим новые константы для режимов игры
+const GAME_MODES = {
+  CLASSIC: "classic",
+  CRAZY_JUMPS: "crazy_jumps", // Прыжки через всю доску
+  PARTY_MODE: "party_mode", // Случайные эффекты и повороты фигур
+  TURBO: "turbo", // Ускоренный режим с быстрым ботом
+};
+
 // Initial board setup
 const createInitialBoard = () => {
   const board = Array(BOARD_SIZE)
@@ -40,6 +48,10 @@ const createInitialBoard = () => {
 
 // Main game component
 const App = () => {
+  // Добавим новые состояния
+  const [gameMode, setGameMode] = useState(GAME_MODES.CLASSIC);
+  const [showModeSelect, setShowModeSelect] = useState(false);
+
   const [board, setBoard] = useState(createInitialBoard());
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [playerTurn, setPlayerTurn] = useState(true);
@@ -49,6 +61,7 @@ const App = () => {
   );
   const [validMoves, setValidMoves] = useState([]);
   const [jumpExists, setJumpExists] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Check if game is over
   useEffect(() => {
@@ -68,14 +81,27 @@ const App = () => {
     if (!playerTurn && !gameOver) {
       setGameMessage("Корги думает...");
 
-      // Small delay to make the bot feel more natural
+      // Устанавливаем задержку в зависимости от режима
+      const delay = gameMode === GAME_MODES.TURBO ? 200 : 800;
+
       const botTimer = setTimeout(() => {
         makeBotMove();
-      }, 800);
+      }, delay);
 
       return () => clearTimeout(botTimer);
     }
-  }, [playerTurn, gameOver]);
+  }, [playerTurn, gameOver, gameMode]); // Добавляем gameMode в зависимости
+
+  // Добавьте слушатель событий для изменения полноэкранного режима
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   // Check if any player has no valid moves left
   const checkGameStatus = () => {
@@ -123,6 +149,53 @@ const App = () => {
       }
     }
     return false;
+  };
+
+  // Добавим функцию для применения эффектов режима
+  const applyModeEffects = (moves, currentMode) => {
+    switch (currentMode) {
+      case GAME_MODES.CRAZY_JUMPS:
+        // Увеличиваем дальность прыжков
+        return moves.map((move) => {
+          if ("jumpRow" in move) {
+            // Если это прыжок
+            const rowDiff = move.row - move.jumpRow;
+            const colDiff = move.col - move.jumpCol;
+
+            // Увеличиваем дистанцию прыжка в 2 раза
+            const newRow = Math.min(
+              Math.max(0, move.row + rowDiff),
+              BOARD_SIZE - 1
+            );
+            const newCol = Math.min(
+              Math.max(0, move.col + colDiff),
+              BOARD_SIZE - 1
+            );
+
+            return {
+              ...move,
+              row: newRow,
+              col: newCol,
+            };
+          }
+          return move;
+        });
+
+      case GAME_MODES.PARTY_MODE:
+        document.querySelectorAll(".piece").forEach((piece) => {
+          piece.classList.add("spin-piece");
+        });
+        return moves;
+
+      case GAME_MODES.TURBO:
+        return moves; // Просто возвращаем ходы, скорость обработаем в другом месте
+
+      default:
+        document.querySelectorAll(".piece").forEach((piece) => {
+          piece.classList.remove("spin-piece", "party-mode");
+        });
+        return moves;
+    }
   };
 
   // Calculate valid moves for a piece
@@ -195,7 +268,8 @@ const App = () => {
     }
 
     // If jumps exist, they are the only valid moves
-    return jumps.length > 0 ? jumps : moves;
+    let validMoves = jumps.length > 0 ? jumps : moves;
+    return applyModeEffects(validMoves, gameMode);
   };
 
   // Check if any jump is available for the current player
@@ -743,6 +817,21 @@ const App = () => {
     setJumpExists(false);
   };
 
+  // Добавьте функцию для переключения полноэкранного режима
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      const board = document.getElementById("chess-board");
+      if (board.requestFullscreen) {
+        board.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+    setIsFullscreen(!isFullscreen);
+  };
+
   // Render the board
   const renderBoard = () => {
     const squares = [];
@@ -804,12 +893,14 @@ const App = () => {
     if (!piece) return null;
 
     let pieceClass = `
+      piece 
       w-full h-full rounded-full 
       flex items-center justify-center 
       transform transition-all duration-200 
       hover:scale-110 cursor-pointer 
       shadow-lg hover:shadow-xl
       animate-[pieceHover_0.2s_ease-in-out]
+      ${gameMode === GAME_MODES.PARTY_MODE ? "party-mode" : ""} 
     `;
 
     let imgSrc = null;
@@ -849,60 +940,126 @@ const App = () => {
     );
   };
 
+  // Добавим компонент выбора режима
+  const renderModeSelect = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full space-y-6 animate-[appear_0.3s_ease-out]">
+        <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">
+          Выберите режим игры
+        </h2>
+
+        <div className="space-y-4">
+          <button
+            onClick={() => {
+              setGameMode(GAME_MODES.CLASSIC);
+              setShowModeSelect(false);
+              restartGame();
+            }}
+            className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-500 
+                     hover:from-blue-600 hover:to-purple-600 text-white rounded-xl
+                     transform transition-all duration-200 hover:scale-105">
+            🎮 Классический режим
+          </button>
+
+          <button
+            onClick={() => {
+              setGameMode(GAME_MODES.CRAZY_JUMPS);
+              setShowModeSelect(false);
+              restartGame();
+            }}
+            className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-teal-500 
+                     hover:from-green-600 hover:to-teal-600 text-white rounded-xl
+                     transform transition-all duration-200 hover:scale-105">
+            🦘 Сумасшедшие прыжки
+          </button>
+
+          <button
+            onClick={() => {
+              setGameMode(GAME_MODES.PARTY_MODE);
+              setShowModeSelect(false);
+              restartGame();
+            }}
+            className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 
+                     hover:from-pink-600 hover:to-purple-600 text-white rounded-xl
+                     transform transition-all duration-200 hover:scale-105">
+            🎉 Режим вечеринки
+          </button>
+
+          <button
+            onClick={() => {
+              setGameMode(GAME_MODES.TURBO);
+              setShowModeSelect(false);
+              restartGame();
+            }}
+            className="w-full px-6 py-4 bg-gradient-to-r from-red-500 to-orange-500 
+                     hover:from-red-600 hover:to-orange-600 text-white rounded-xl
+                     transform transition-all duration-200 hover:scale-105">
+            ⚡ Турбо режим
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Модифицируем return для исправления кнопки выбора режима
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {showModeSelect && renderModeSelect()}
+
       <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8 max-w-4xl mx-auto animate-[appear_0.5s_ease-out]">
-          <div className="py-8">
-            <div className="space-y-8">
-              <h1 className="text-4xl md:text-5xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 animate-[messageSlide_0.5s_ease-out]">
-                Корги против Биглей
-              </h1>
+        <div className="space-y-8 max-w-4xl mx-auto">
+          <div className="flex justify-between items-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600">
+              Корги против Биглей
+            </h1>
+            <button
+              onClick={() => setShowModeSelect(true)}
+              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
+                       text-white rounded-lg shadow-lg transform transition-all 
+                       duration-200 hover:scale-105 flex items-center space-x-2">
+              <span>🎮</span>
+              <span>Режим игры</span>
+            </button>
+          </div>
 
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-lg p-6 text-center transform transition-all duration-200 hover:shadow-xl">
-                <p className="text-xl md:text-2xl font-medium text-gray-800 dark:text-white animate-[messageSlide_0.3s_ease-out]">
-                  {gameMessage}
+          <div className="text-center mb-4">
+            <p className="text-xl font-semibold animate-[messageSlide_0.5s_ease-out]">
+              {gameMessage}
+            </p>
+          </div>
+
+          <div id="chess-board" className="mx-auto">
+            {renderBoard()}
+          </div>
+
+          {gameOver && (
+            <button
+              onClick={restartGame}
+              className="mt-4 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 
+                       text-white rounded-xl shadow-lg transform transition-all 
+                       duration-200 hover:scale-105">
+              Начать новую игру
+            </button>
+          )}
+
+          <div className="mt-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
+                Как играть:
+              </h2>
+              <div className="space-y-4">
+                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
+                  1. Нажмите на вашего Бигля, чтобы выбрать его
                 </p>
-              </div>
-
-              <div className="flex justify-center items-center">
-                <div className="w-full max-w-[600px] aspect-square">
-                  {renderBoard()}
-                </div>
-              </div>
-
-              {gameOver && (
-                <div className="text-center py-4">
-                  <button
-                    className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 
-                           hover:from-blue-600 hover:to-purple-600 text-white text-xl 
-                           font-semibold rounded-xl shadow-lg transform transition-all 
-                           duration-200 hover:scale-105 focus:outline-none focus:ring-2 
-                           focus:ring-offset-2 focus:ring-blue-500"
-                    onClick={restartGame}>
-                    Играть снова
-                  </button>
-                </div>
-              )}
-
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
-                <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
-                  Как играть:
-                </h2>
-                <div className="space-y-4">
-                  <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                    1. Нажмите на вашего Бигля, чтобы выбрать его
-                  </p>
-                  <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                    2. Нажмите на подсвеченную клетку для хода
-                  </p>
-                  <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                    3. Вы должны прыгать, если прыжок доступен
-                  </p>
-                  <p className="text-lg text-center text-gray-700 dark:text-gray-300">
-                    4. Короли могут ходить вперёд и назад
-                  </p>
-                </div>
+                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
+                  2. Нажмите на подсвеченную клетку для хода
+                </p>
+                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
+                  3. Вы должны прыгать, если прыжок доступен
+                </p>
+                <p className="text-lg text-center text-gray-700 dark:text-gray-300">
+                  4. Короли могут ходить вперёд и назад
+                </p>
               </div>
             </div>
           </div>
