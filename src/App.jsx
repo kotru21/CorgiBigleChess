@@ -976,39 +976,11 @@ const App = () => {
       }
     }
 
-    // Упрощаем классы для мобильных устройств
-    let boardClass = `
-      grid grid-cols-8 border-2 border-black 
-      transition-transform duration-300
-      ${
-        isFullscreen
-          ? "fixed inset-0 w-screen h-screen"
-          : "w-full max-w-[600px] aspect-square"
-      }
-    `;
-
-    // Убираем тяжелые градиенты для мобильных
-    let containerClass = `
-      flex items-center justify-center w-full h-full
-      ${isFullscreen ? "fixed inset-0 bg-black z-50" : ""}
-    `;
-
-    // Оптимизируем стили квадратов для мобильных
-    const getSquareClass = (isBlack) => {
-      const isMobile = window.innerWidth < 768;
-      if (isMobile) {
-        return isBlack ? "bg-gray-700" : "bg-gray-300";
-      }
-      return isBlack
-        ? "bg-gradient-to-br from-gray-700 to-gray-800"
-        : "bg-gradient-to-br from-gray-200 to-gray-300";
-    };
-
     return (
       <div
         id="chess-board-container"
         className={`
-          relative flex items-center justify-center
+           flex items-center justify-center
           ${
             isFullscreen
               ? "fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 w-screen h-screen"
@@ -1030,6 +1002,16 @@ const App = () => {
           `}>
           {squares}
         </div>
+        {isFullscreen && (
+          <button
+            onClick={toggleFullscreen}
+            className="absolute top-4 right-4 p-2 
+                     bg-white/10 hover:bg-white/20 
+                     text-white rounded-lg
+                     transition-all duration-200">
+            <span className="text-2xl">×</span>
+          </button>
+        )}
       </div>
     );
   };
