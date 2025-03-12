@@ -394,7 +394,6 @@ const App = () => {
       }
     }
   };
-
   // Move a piece on the board
   const movePiece = (fromRow, fromCol, toRow, toCol) => {
     const newBoard = board.map((row) => [...row]);
@@ -576,7 +575,12 @@ const App = () => {
             shadow-2xl
             transition-all duration-300
           `}>
-          <Board3D board={board} onPieceSelect={handlePieceSelect} />
+          <Board3D
+            board={board}
+            onPieceSelect={handlePieceSelect}
+            selectedPiece={selectedPiece}
+            validMoves={validMoves}
+          />
         </div>
       </div>
     );
