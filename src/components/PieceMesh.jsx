@@ -58,7 +58,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
       scale={hovered || isSelected ? 1.1 : 1}>
       {/* Тень под фигурой */}
       <mesh
-        position={[0, -0.09, 0]}
+        position={[0, -0.08, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow>
         <circleGeometry args={[0.4, 32]} />
@@ -84,8 +84,8 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
       {isKing && crownModel.scene && (
         <primitive
           object={crownModel.scene.clone()}
-          position={[0, 0.5, 0]}
-          scale={0.2}
+          position={[0, 0.4, 0]}
+          scale={0.02}
           castShadow
         />
       )}

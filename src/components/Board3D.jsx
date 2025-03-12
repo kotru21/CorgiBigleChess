@@ -41,7 +41,7 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
         squares.push(
           <mesh
             key={`${row}-${col}`}
-            position={[row - 3.5, -0.1, col - 3.5]}
+            position={[row - 3.5, -0.099, col - 3.5]}
             rotation={[-Math.PI / 2, 0, 0]}
             receiveShadow
             onClick={() => (isValidMove ? onPieceSelect(row, col) : null)}
