@@ -33,8 +33,9 @@ const createInitialBoard = () => {
     }
   }
 
-  // Расставляем шашки на 6-й и 7-й горизонталях для игрока (бигли)
-  for (let row = 6; row < 8; row++) {
+  // Расставляем шашки на 5-й и 6-й горизонталях для игрока (бигли)
+  // Раньше было: for (let row = 6; row < 8; row++) { ... }
+  for (let row = 5; row < 7; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       board[row][col] = PLAYER;
     }
