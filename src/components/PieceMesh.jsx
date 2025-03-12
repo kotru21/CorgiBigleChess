@@ -35,7 +35,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   useFrame(() => {
     if (groupRef.current) {
       // Плавное изменение высоты
-      setCurrentHeight(currentHeight + (targetHeight - currentHeight) * 0.1);
+      setCurrentHeight(currentHeight + (targetHeight - currentHeight) * 0.01);
       groupRef.current.position.y = currentHeight;
 
       // Вращение при наведении или выборе
