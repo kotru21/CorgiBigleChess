@@ -991,8 +991,7 @@ const App = () => {
           aspect-square flex items-center justify-center relative 
           transform transition-all duration-200
           hover:shadow-inner cursor-pointer
-          ${gameMode === GAME_MODES.PARTY_MODE ? "party-square" : ""}
-        `;
+          ${gameMode === GAME_MODES.PARTY_MODE ? "party-square" : ""}`;
 
         if (isBlack) {
           squareClass +=
@@ -1006,6 +1005,7 @@ const App = () => {
               : " bg-gradient-to-br from-gray-200 to-gray-300";
         }
 
+        // Подсвечиваем выбранную шашку
         if (
           selectedPiece &&
           selectedPiece.row === row &&
@@ -1014,10 +1014,17 @@ const App = () => {
           squareClass += " ring-4 ring-yellow-400 shadow-lg scale-105";
         }
 
+        // Если ход обязательный - подсвечиваем шашки игрока с доступными прыжками
+        if (playerTurn && (piece === PLAYER || piece === PLAYER_KING)) {
+          const movesForPiece = calculateValidMoves(row, col);
+          if (movesForPiece.some((move) => move.jumpRow !== undefined)) {
+            squareClass += " ring-4 ring-red-500";
+          }
+        }
+
         const isValidMove = validMoves.some(
           (move) => move.row === row && move.col === col
         );
-
         if (isValidMove) {
           squareClass +=
             " bg-gradient-to-br from-green-400 to-green-600 bg-opacity-70 animate-[validMove_1s_ease-in-out_infinite_alternate]";
