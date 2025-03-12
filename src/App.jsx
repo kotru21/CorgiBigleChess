@@ -24,6 +24,7 @@ import {
   minimax,
   findBestMove,
 } from "./gameUtils.js";
+import { Board3D } from "./components/Board3D";
 
 // Main game component
 const App = () => {
@@ -550,74 +551,13 @@ const App = () => {
     }
   };
 
-  // Обновленный renderBoard
+  // Обновим renderBoard для использования 3D
   const renderBoard = () => {
-    const squares = [];
-
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        const isBlack = (row + col) % 2 === 1;
-        const piece = board[row][col];
-
-        let squareClass = `
-          aspect-square flex items-center justify-center relative 
-          transform transition-all duration-200
-          hover:shadow-inner cursor-pointer
-          ${gameMode === GAME_MODES.PARTY_MODE ? "party-square" : ""}`;
-
-        if (isBlack) {
-          squareClass +=
-            gameMode === GAME_MODES.PARTY_MODE
-              ? ` bg-gradient-to-br from-${getRandomColor()} to-${getRandomColor()}`
-              : " bg-gradient-to-br from-gray-700 to-gray-800";
-        } else {
-          squareClass +=
-            gameMode === GAME_MODES.PARTY_MODE
-              ? ` bg-gradient-to-br from-${getRandomColor()} to-${getRandomColor()}`
-              : " bg-gradient-to-br from-gray-200 to-gray-300";
-        }
-
-        // Подсвечиваем выбранную шашку
-        if (
-          selectedPiece &&
-          selectedPiece.row === row &&
-          selectedPiece.col === col
-        ) {
-          squareClass += " ring-4 ring-yellow-400 shadow-lg scale-105";
-        }
-
-        // Если ход обязательный - подсвечиваем шашки игрока с доступными прыжками
-        if (playerTurn && (piece === PLAYER || piece === PLAYER_KING)) {
-          const movesForPiece = calculateValidMoves(row, col);
-          if (movesForPiece.some((move) => move.jumpRow !== undefined)) {
-            squareClass += " ring-4 ring-red-500";
-          }
-        }
-
-        const isValidMove = validMoves.some(
-          (move) => move.row === row && move.col === col
-        );
-        if (isValidMove) {
-          squareClass +=
-            " bg-gradient-to-br from-green-400 to-green-600 bg-opacity-70 animate-[validMove_1s_ease-in-out_infinite_alternate]";
-        }
-
-        squares.push(
-          <div
-            key={`${row}-${col}`}
-            className={squareClass}
-            onClick={() => handlePieceSelect(row, col)}>
-            <div className="w-[80%] h-[80%]">{renderPiece(piece)}</div>
-          </div>
-        );
-      }
-    }
-
     return (
       <div
         id="chess-board-container"
         className={`
-           flex items-center justify-center
+          flex items-center justify-center
           ${
             isFullscreen
               ? "fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 w-screen h-screen"
@@ -628,7 +568,6 @@ const App = () => {
         <div
           id="chess-board"
           className={`
-            grid grid-cols-8 border-2 border-black
             ${
               isFullscreen
                 ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
@@ -637,18 +576,8 @@ const App = () => {
             shadow-2xl
             transition-all duration-300
           `}>
-          {squares}
+          <Board3D board={board} onPieceSelect={handlePieceSelect} />
         </div>
-        {isFullscreen && (
-          <button
-            onClick={toggleFullscreen}
-            className="absolute top-4 right-4 p-2 
-                     bg-white/10 hover:bg-white/20 
-                     text-white rounded-lg
-                     transition-all duration-200">
-            <span className="text-2xl">×</span>
-          </button>
-        )}
       </div>
     );
   };
