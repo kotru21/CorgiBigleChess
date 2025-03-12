@@ -26,20 +26,17 @@ const createInitialBoard = () => {
     .fill()
     .map(() => Array(BOARD_SIZE).fill(EMPTY));
 
-  // Place pieces
-  for (let row = 0; row < 3; row++) {
+  // Расставляем шашки на 2-й и 3-й горизонталях для бота (корги)
+  for (let row = 1; row < 3; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
-      if ((row + col) % 2 === 1) {
-        board[row][col] = BOT;
-      }
+      board[row][col] = BOT;
     }
   }
 
-  for (let row = BOARD_SIZE - 3; row < BOARD_SIZE; row++) {
+  // Расставляем шашки на 6-й и 7-й горизонталях для игрока (бигли)
+  for (let row = 6; row < 8; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
-      if ((row + col) % 2 === 1) {
-        board[row][col] = PLAYER;
-      }
+      board[row][col] = PLAYER;
     }
   }
 
@@ -253,7 +250,6 @@ const App = () => {
   // Calculate valid moves for a piece
   const calculateValidMoves = (row, col) => {
     const piece = board[row][col];
-
     if (!piece) return [];
 
     const isKing = piece === PLAYER_KING || piece === BOT_KING;
@@ -262,66 +258,103 @@ const App = () => {
     let moves = [];
     let jumps = [];
 
-    // Direction of movement based on piece type
-    const directions = [];
-    if (isPlayer || isKing) directions.push(-1); // Move up
-    if (!isPlayer || isKing) directions.push(1); // Move down
+    // Направления движения: вверх, вправо, вниз, влево
+    const directions = [
+      [-1, 0], // вверх
+      [0, 1], // вправо
+      [1, 0], // вниз
+      [0, -1], // влево
+    ];
 
-    // Check each direction
-    for (const rowDir of directions) {
-      // Check left and right diagonal
-      for (const colDir of [-1, 1]) {
-        const newRow = row + rowDir;
-        const newCol = col + colDir;
+    for (const [rowDir, colDir] of directions) {
+      // Пропускаем ход назад для обычных шашек и взятие назад
+      if (
+        !isKing &&
+        ((isPlayer && rowDir === 1) || (!isPlayer && rowDir === -1))
+      ) {
+        continue;
+      }
 
-        // Check if the move is within bounds
+      let newRow = row + rowDir;
+      let newCol = col + colDir;
+
+      // Проверяем обычный ход
+      if (
+        newRow >= 0 &&
+        newRow < BOARD_SIZE &&
+        newCol >= 0 &&
+        newCol < BOARD_SIZE &&
+        board[newRow][newCol] === EMPTY
+      ) {
+        // Простые шашки могут ходить только вперед и в стороны
+        if (!isKing && rowDir === (isPlayer ? 1 : -1)) {
+          continue;
+        }
+        moves.push({ row: newRow, col: newCol });
+      }
+
+      // Проверяем взятие
+      if (
+        newRow >= 0 &&
+        newRow < BOARD_SIZE &&
+        newCol >= 0 &&
+        newCol < BOARD_SIZE &&
+        board[newRow][newCol] !== EMPTY
+      ) {
+        const jumpRow = newRow + rowDir;
+        const jumpCol = newCol + colDir;
+
         if (
+          jumpRow >= 0 &&
+          jumpRow < BOARD_SIZE &&
+          jumpCol >= 0 &&
+          jumpCol < BOARD_SIZE &&
+          board[jumpRow][jumpCol] === EMPTY
+        ) {
+          const jumpedPiece = board[newRow][newCol];
+          // Проверяем, что мы бьем фишку противника
+          if (
+            (isPlayer && (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
+            (!isPlayer &&
+              (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
+          ) {
+            // Для простых шашек нельзя бить назад
+            if (!isKing && rowDir === (isPlayer ? 1 : -1)) {
+              continue;
+            }
+            jumps.push({
+              row: jumpRow,
+              col: jumpCol,
+              jumpRow: newRow,
+              jumpCol: newCol,
+            });
+          }
+        }
+      }
+
+      // Для дамок добавляем ходы на несколько клеток
+      if (isKing) {
+        let distance = 2;
+        newRow = row + rowDir * distance;
+        newCol = col + colDir * distance;
+
+        while (
           newRow >= 0 &&
           newRow < BOARD_SIZE &&
           newCol >= 0 &&
-          newCol < BOARD_SIZE
+          newCol < BOARD_SIZE &&
+          board[newRow][newCol] === EMPTY
         ) {
-          // Check if the space is empty (regular move)
-          if (board[newRow][newCol] === EMPTY) {
-            moves.push({ row: newRow, col: newCol });
-          }
-          // Check for jumps
-          else {
-            const jumpRow = newRow + rowDir;
-            const jumpCol = newCol + colDir;
-
-            if (
-              jumpRow >= 0 &&
-              jumpRow < BOARD_SIZE &&
-              jumpCol >= 0 &&
-              jumpCol < BOARD_SIZE &&
-              board[jumpRow][jumpCol] === EMPTY
-            ) {
-              const jumpedPiece = board[newRow][newCol];
-
-              // Make sure we're jumping an opponent's piece
-              if (
-                (isPlayer &&
-                  (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
-                (!isPlayer &&
-                  (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
-              ) {
-                jumps.push({
-                  row: jumpRow,
-                  col: jumpCol,
-                  jumpRow: newRow,
-                  jumpCol: newCol,
-                });
-              }
-            }
-          }
+          moves.push({ row: newRow, col: newCol });
+          distance++;
+          newRow = row + rowDir * distance;
+          newCol = col + colDir * distance;
         }
       }
     }
 
-    // If jumps exist, they are the only valid moves
-    let validMoves = jumps.length > 0 ? jumps : moves;
-    return applyModeEffects(validMoves, gameMode);
+    // Если есть взятия, возвращаем только их
+    return jumps.length > 0 ? jumps : moves;
   };
 
   // Check if any jump is available for the current player
@@ -384,34 +417,34 @@ const App = () => {
     const newBoard = board.map((row) => [...row]);
     const piece = newBoard[fromRow][fromCol];
 
-    // Check if we're making a jump
-    const isJump = Math.abs(fromRow - toRow) === 2;
+    // Определяем, совершается ли прыжок (с учетом горизонтальных ходов)
+    const isJump =
+      Math.abs(fromRow - toRow) === 2 || Math.abs(fromCol - toCol) === 2;
 
-    // Move the piece
+    // Перемещаем шашку
     newBoard[fromRow][fromCol] = EMPTY;
     newBoard[toRow][toCol] = piece;
 
-    // Check for king promotion
+    // Проверка на превращение в дамку
     if (piece === PLAYER && toRow === 0) {
       newBoard[toRow][toCol] = PLAYER_KING;
     } else if (piece === BOT && toRow === BOARD_SIZE - 1) {
       newBoard[toRow][toCol] = BOT_KING;
     }
 
-    // If it's a jump, remove the jumped piece
+    // Если это прыжок, удаляем перепрыгнутую шашку
     if (isJump) {
       const jumpRow = (fromRow + toRow) / 2;
       const jumpCol = (fromCol + toCol) / 2;
       newBoard[jumpRow][jumpCol] = EMPTY;
 
-      // Check for multiple jumps
+      // Проверка на множественные прыжки
       const moveInfo = validMoves.find(
         (move) => move.row === toRow && move.col === toCol
       );
       setBoard(newBoard);
 
       if (moveInfo && "jumpRow" in moveInfo) {
-        // Check if additional jumps are available
         const additionalJumps = calculateValidMoves(toRow, toCol).filter(
           (move) => "jumpRow" in move
         );
@@ -742,7 +775,6 @@ const App = () => {
   // Calculate valid moves for a piece on a specific board state
   const calculateValidMovesForBoard = (currentBoard, row, col) => {
     const piece = currentBoard[row][col];
-
     if (!piece) return [];
 
     const isKing = piece === PLAYER_KING || piece === BOT_KING;
@@ -751,64 +783,90 @@ const App = () => {
     let moves = [];
     let jumps = [];
 
-    // Direction of movement based on piece type
-    const directions = [];
-    if (isPlayer || isKing) directions.push(-1); // Move up
-    if (!isPlayer || isKing) directions.push(1); // Move down
+    // Направления движения: вверх, вправо, вниз, влево
+    const directions = [
+      [-1, 0], // вверх
+      [0, 1], // вправо
+      [1, 0], // вниз
+      [0, -1], // влево
+    ];
 
-    // Check each direction
-    for (const rowDir of directions) {
-      // Check left and right diagonal
-      for (const colDir of [-1, 1]) {
-        const newRow = row + rowDir;
-        const newCol = col + colDir;
+    for (const [rowDir, colDir] of directions) {
+      // Пропускаем ход назад для обычных шашек
+      if (
+        !isKing &&
+        ((isPlayer && rowDir === 1) || (!isPlayer && rowDir === -1))
+      ) {
+        continue;
+      }
 
-        // Check if the move is within bounds
-        if (
-          newRow >= 0 &&
-          newRow < BOARD_SIZE &&
-          newCol >= 0 &&
-          newCol < BOARD_SIZE
-        ) {
-          // Check if the space is empty (regular move)
-          if (currentBoard[newRow][newCol] === EMPTY) {
-            moves.push({ row: newRow, col: newCol });
-          }
-          // Check for jumps
-          else {
-            const jumpRow = newRow + rowDir;
-            const jumpCol = newCol + colDir;
+      const newRow = row + rowDir;
+      const newCol = col + colDir;
 
+      // Проверяем, находится ли ход в пределах доски
+      if (
+        newRow >= 0 &&
+        newRow < BOARD_SIZE &&
+        newCol >= 0 &&
+        newCol < BOARD_SIZE
+      ) {
+        // Проверяем обычный ход
+        if (currentBoard[newRow][newCol] === EMPTY) {
+          moves.push({ row: newRow, col: newCol });
+        }
+        // Проверяем взятие
+        else {
+          const jumpRow = newRow + rowDir;
+          const jumpCol = newCol + colDir;
+
+          if (
+            jumpRow >= 0 &&
+            jumpRow < BOARD_SIZE &&
+            jumpCol >= 0 &&
+            jumpCol < BOARD_SIZE &&
+            currentBoard[jumpRow][jumpCol] === EMPTY
+          ) {
+            const jumpedPiece = currentBoard[newRow][newCol];
+
+            // Проверяем, что бьем фишку противника
             if (
-              jumpRow >= 0 &&
-              jumpRow < BOARD_SIZE &&
-              jumpCol >= 0 &&
-              jumpCol < BOARD_SIZE &&
-              currentBoard[jumpRow][jumpCol] === EMPTY
+              (isPlayer && (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
+              (!isPlayer &&
+                (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
             ) {
-              const jumpedPiece = currentBoard[newRow][newCol];
-
-              // Make sure we're jumping an opponent's piece
-              if (
-                (isPlayer &&
-                  (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
-                (!isPlayer &&
-                  (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
-              ) {
-                jumps.push({
-                  row: jumpRow,
-                  col: jumpCol,
-                  jumpRow: newRow,
-                  jumpCol: newCol,
-                });
-              }
+              jumps.push({
+                row: jumpRow,
+                col: jumpCol,
+                jumpRow: newRow,
+                jumpCol: newCol,
+              });
             }
+          }
+        }
+
+        // Для дамок добавляем ходы на несколько клеток
+        if (isKing) {
+          let distance = 2;
+          let longRow = row + rowDir * distance;
+          let longCol = col + colDir * distance;
+
+          while (
+            longRow >= 0 &&
+            longRow < BOARD_SIZE &&
+            longCol >= 0 &&
+            longCol < BOARD_SIZE &&
+            currentBoard[longRow][longCol] === EMPTY
+          ) {
+            moves.push({ row: longRow, col: longCol });
+            distance++;
+            longRow = row + rowDir * distance;
+            longCol = col + colDir * distance;
           }
         }
       }
     }
 
-    // If jumps exist, they are the only valid moves
+    // Если есть взятия, возвращаем только их
     return jumps.length > 0 ? jumps : moves;
   };
 
@@ -1181,20 +1239,7 @@ const App = () => {
                   Корги против Биглей
                 </h1>
                 <div className="flex gap-4">
-                  <button
-                    onClick={() => setShowModeSelect(true)}
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
-                             text-white rounded-lg shadow-lg transform transition-all 
-                             duration-200 hover:scale-105 flex items-center gap-2">
-                    <span>🎮</span>
-                    <span>Режим игры</span>
-                  </button>
-                  <button
-                    onClick={toggleFullscreen}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 
-                             text-white rounded-lg shadow-lg transform transition-all 
-                             duration-200 hover:scale-105 flex items-center gap-2">
-                    <span>{isFullscreen ? "🔄" : "📺"}</span>
+                  <button onClick={() => setShowModeSelect(true)}>
                     <span>{isFullscreen ? "Выйти" : "На весь экран"}</span>
                   </button>
                 </div>
