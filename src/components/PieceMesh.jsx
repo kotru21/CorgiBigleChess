@@ -75,7 +75,9 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
           object={model.scene.clone()}
           scale={type === "corgi" ? 0.8 : 0.8} // Масштаб для разных моделей
           position={[0, 0, 0]}
-          rotation={[0, Math.PI, 0]} // Поворачиваем модель лицом к игроку
+          rotation={
+            type === "corgi" ? [0, 2 * Math.PI, 0] : [0, 3.5 * Math.PI, 0]
+          } // Поворачиваем модель лицом к игроку
           castShadow
         />
       )}
