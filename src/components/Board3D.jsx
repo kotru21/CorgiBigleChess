@@ -2,8 +2,6 @@ import { Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
-import { Environment } from "@react-three/drei";
-import { Color } from "three";
 import React from "react";
 import { PLAYER, BOT, PLAYER_KING, BOT_KING, EMPTY } from "../constants.js";
 
@@ -16,6 +14,8 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const isEven = (row + col) % 2 === 0;
+
+        // Определяем, является ли клетка выбранной или доступным ходом
         const isSelected =
           selectedPiece &&
           selectedPiece.row === row &&
@@ -28,18 +28,14 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           hoveredSquare.row === row &&
           hoveredSquare.col === col;
 
-        // Enhanced color palette with better wood textures
-        let color = isEven ? "#3D2314" : "#754C29";
-        let emissive = new Color(0x000000);
-
+        // Выбираем цвет клетки
+        let color = isEven ? "#553311" : "#8B4513";
         if (isSelected) {
-          color = "#4CAF50";
-          emissive = new Color(0x224422);
+          color = "#66BB66"; // Зеленый для выбранной фигуры
         } else if (isValidMove) {
-          color = "#2196F3";
-          emissive = new Color(0x112233);
+          color = "#6699FF"; // Синий для доступных ходов
         } else if (isHovered && !isEven) {
-          color = "#8B5A2B";
+          color = "#AA6633"; // Светлее для наведения на темные клетки
         }
 
         squares.push(
@@ -48,24 +44,16 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
             position={[row - 3.5, -0.099, col - 3.5]}
             rotation={[-Math.PI / 2, 0, 0]}
             receiveShadow
-            onClick={() =>
-              isValidMove || board[row][col] !== EMPTY
-                ? onPieceSelect(row, col)
-                : null
-            }
+            onClick={() => (isValidMove ? onPieceSelect(row, col) : null)}
             onPointerOver={() => setHoveredSquare({ row, col })}
             onPointerOut={() => setHoveredSquare(null)}>
-            <planeGeometry args={[0.95, 0.95]} />
-            <meshPhysicalMaterial
+            <planeGeometry args={[1, 1]} />
+            <meshStandardMaterial
               color={color}
               metalness={0.1}
               roughness={0.8}
-              clearcoat={0.3}
-              clearcoatRoughness={0.25}
-              emissive={emissive}
-              emissiveIntensity={0.3}
               transparent={isValidMove}
-              opacity={isValidMove ? 0.9 : 1}
+              opacity={isValidMove ? 0.8 : 1}
             />
           </mesh>
         );
@@ -91,7 +79,7 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
   };
 
   return (
-    <Canvas shadows gl={{ antialias: true, alpha: true }} dpr={[1, 2]}>
+    <Canvas shadows camera={{ position: [0, 5, 5], fov: 50 }}>
       <PerspectiveCamera makeDefault position={[0, 5, 5]} />
       <OrbitControls
         enableZoom={true}
@@ -100,31 +88,16 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
       />
 
       {/* Освещение */}
-
-      {/* Enhanced lighting */}
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={0.5} />
       <directionalLight
-        position={[5, 8, 5]}
-        intensity={1.2}
+        position={[5, 5, 5]}
+        intensity={1}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-bias={-0.0001}
-        shadow-camera-near={0.1}
-        shadow-camera-far={50}
-        shadow-camera-left={-8}
-        shadow-camera-right={8}
-        shadow-camera-top={8}
-        shadow-camera-bottom={-8}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
       />
-      <spotLight
-        position={[-5, 10, -2]}
-        angle={0.5}
-        penumbra={0.5}
-        intensity={0.8}
-        castShadow
-      />
-      <hemisphereLight intensity={0.4} color="#ddeeff" groundColor="#472b0c" />
+      <directionalLight position={[-5, 5, -5]} intensity={0.5} />
+
       {/* Доска */}
       <group>
         {/* Основание доски */}
@@ -132,15 +105,14 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           <boxGeometry args={[8.2, 0.2, 8.2]} />
           <meshStandardMaterial
             color="#4A3728"
-            metalness={0.05}
-            roughness={0.5}
+            metalness={0.2}
+            roughness={0.8}
           />
         </mesh>
-
         {/* Клетки доски */}
         {renderBoardSquares()}
       </group>
-      <Environment preset="park" />
+
       {/* Фигуры */}
       <Suspense fallback={null}>
         {board.map((row, rowIndex) =>
