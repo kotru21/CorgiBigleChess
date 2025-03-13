@@ -54,14 +54,11 @@ export const getAllPossibleMoves = (currentBoard, playerType) => {
   let jumpsAvailable = false;
   let allMoves = [];
 
-  // First pass to check for jumps
   pieces.forEach(({ row, col }) => {
     const moves = calculateValidMovesForBoard(currentBoard, row, col);
-    const jumpMoves = moves.filter((move) => "jumpRow" in move);
-
-    if (jumpMoves.length > 0) {
-      jumpsAvailable = true;
-      jumpMoves.forEach((move) => {
+    moves.forEach((move) => {
+      if ("jumpRow" in move) {
+        jumpsAvailable = true;
         allMoves.push({
           fromRow: row,
           fromCol: col,
@@ -71,17 +68,7 @@ export const getAllPossibleMoves = (currentBoard, playerType) => {
           jumpRow: move.jumpRow,
           jumpCol: move.jumpCol,
         });
-      });
-    }
-  });
-
-  // If no jumps, collect regular moves
-  if (!jumpsAvailable) {
-    pieces.forEach(({ row, col }) => {
-      const moves = calculateValidMovesForBoard(currentBoard, row, col);
-      const regularMoves = moves.filter((move) => !("jumpRow" in move));
-
-      regularMoves.forEach((move) => {
+      } else if (!jumpsAvailable) {
         allMoves.push({
           fromRow: row,
           fromCol: col,
@@ -89,11 +76,11 @@ export const getAllPossibleMoves = (currentBoard, playerType) => {
           toCol: move.col,
           isJump: false,
         });
-      });
+      }
     });
-  }
+  });
 
-  return allMoves;
+  return jumpsAvailable ? allMoves.filter((move) => move.isJump) : allMoves;
 };
 
 /**
@@ -135,16 +122,18 @@ export const minimax = (currentBoard, depth, alpha, beta, isMaximizing) => {
     const botMoves = getAllPossibleMoves(currentBoard, BOT);
     for (const move of botMoves) {
       const newBoard = currentBoard.map((row) => [...row]);
-      const { fromRow, fromCol, toRow, toCol, isJump, jumpRow, jumpCol } = move;
+      const { fromRow, fromCol, toRow, toCol, isJump } = move;
       const piece = newBoard[fromRow][fromCol];
       // Применяем ход
-      newBoard[fromRow][fromCol] = EMPTY;
+      newBoard[fromRow][fromCol] = null;
       newBoard[toRow][toCol] = piece;
       if (piece === BOT && toRow === BOARD_SIZE - 1) {
         newBoard[toRow][toCol] = BOT_KING;
       }
-      if (isJump && jumpRow !== undefined && jumpCol !== undefined) {
-        newBoard[jumpRow][jumpCol] = EMPTY;
+      if (isJump) {
+        const jumpRow = (fromRow + toRow) / 2;
+        const jumpCol = (fromCol + toCol) / 2;
+        newBoard[jumpRow][jumpCol] = null;
       }
       const score = minimax(newBoard, depth - 1, alpha, beta, false);
       bestScore = Math.max(score, bestScore);
@@ -158,16 +147,16 @@ export const minimax = (currentBoard, depth, alpha, beta, isMaximizing) => {
     for (const move of playerMoves) {
       const newBoard = currentBoard.map((row) => [...row]);
       const { fromRow, fromCol, toRow, toCol, isJump } = move;
-      const jumpRow = move.jumpRow;
-      const jumpCol = move.jumpCol;
       const piece = newBoard[fromRow][fromCol];
-      newBoard[fromRow][fromCol] = EMPTY;
+      newBoard[fromRow][fromCol] = null;
       newBoard[toRow][toCol] = piece;
       if (piece === PLAYER && toRow === 0) {
         newBoard[toRow][toCol] = PLAYER_KING;
       }
-      if (isJump && jumpRow !== undefined && jumpCol !== undefined) {
-        newBoard[jumpRow][jumpCol] = EMPTY;
+      if (isJump) {
+        const jumpRow = (fromRow + toRow) / 2;
+        const jumpCol = (fromCol + toCol) / 2;
+        newBoard[jumpRow][jumpCol] = null;
       }
       const score = minimax(newBoard, depth - 1, alpha, beta, true);
       bestScore = Math.min(score, bestScore);
@@ -182,23 +171,66 @@ export const minimax = (currentBoard, depth, alpha, beta, isMaximizing) => {
  * Находит лучший ход для бота с использованием алгоритма minimax.
  */
 export const findBestMove = (currentBoard, depth) => {
+  const botPieces = [];
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (
+        currentBoard[row][col] === BOT ||
+        currentBoard[row][col] === BOT_KING
+      ) {
+        botPieces.push({ row, col });
+      }
+    }
+  }
   let bestMove = null;
   let bestScore = -Infinity;
-  const possibleMoves = getAllPossibleMoves(currentBoard, BOT);
+  let jumpsAvailable = false;
+  let allPossibleMoves = [];
 
-  if (possibleMoves.length === 0) return null;
+  for (const piece of botPieces) {
+    const { row, col } = piece;
+    const moves = calculateValidMovesForBoard(currentBoard, row, col);
+    for (const move of moves) {
+      if ("jumpRow" in move) {
+        jumpsAvailable = true;
+        allPossibleMoves.push({
+          fromRow: row,
+          fromCol: col,
+          toRow: move.row,
+          toCol: move.col,
+          isJump: true,
+          jumpRow: move.jumpRow,
+          jumpCol: move.jumpCol,
+        });
+      } else if (!jumpsAvailable) {
+        allPossibleMoves.push({
+          fromRow: row,
+          fromCol: col,
+          toRow: move.row,
+          toCol: move.col,
+          isJump: false,
+        });
+      }
+    }
+  }
+  if (jumpsAvailable) {
+    allPossibleMoves = allPossibleMoves.filter((move) => move.isJump);
+  }
+  if (allPossibleMoves.length === 0) return null;
 
-  for (const move of possibleMoves) {
-    const { fromRow, fromCol, toRow, toCol, isJump, jumpRow, jumpCol } = move;
+  for (const move of allPossibleMoves) {
+    const { fromRow, fromCol, toRow, toCol, isJump } = move;
     const newBoard = currentBoard.map((row) => [...row]);
     const piece = newBoard[fromRow][fromCol];
-    newBoard[fromRow][fromCol] = EMPTY;
+    newBoard[fromRow][fromCol] = null;
     newBoard[toRow][toCol] = piece;
     if (piece === BOT && toRow === BOARD_SIZE - 1) {
       newBoard[toRow][toCol] = BOT_KING;
     }
-    if (isJump && jumpRow !== undefined && jumpCol !== undefined) {
-      newBoard[jumpRow][jumpCol] = EMPTY;
+    if (isJump) {
+      const jumpRow = (fromRow + toRow) / 2;
+      const jumpCol = (fromCol + toCol) / 2;
+      newBoard[jumpRow][jumpCol] = null;
     }
     const moveScore = minimax(newBoard, depth - 1, -Infinity, Infinity, false);
     if (moveScore > bestScore) {
@@ -213,73 +245,56 @@ export const findBestMove = (currentBoard, depth) => {
  * Вычисляет все возможные ходы для заданной фигуры на доске.
  */
 export const calculateValidMovesForBoard = (board, row, col) => {
-  // Проверка существования board и корректности координат
-  if (!board || !board[row] || board[row][col] === undefined) return [];
-
   const piece = board[row][col];
-  if (!piece || piece === EMPTY) return [];
+  if (!piece) return [];
 
   const isKing = piece === PLAYER_KING || piece === BOT_KING;
   const isPlayer = piece === PLAYER || piece === PLAYER_KING;
   let moves = [];
   let jumps = [];
 
-  // Направления движения для турецких шашек (диагонали + ортогональные направления)
-  // Турецкие шашки двигаются по диагонали и ортогонально
+  // Direction vectors: up, right, down, left
   const directions = [
-    [-1, -1], // верхний левый
-    [-1, 0], // верхний
-    [-1, 1], // верхний правый
-    [0, -1], // левый
-    [0, 1], // правый
-    [1, -1], // нижний левый
-    [1, 0], // нижний
-    [1, 1], // нижний правый
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+    [0, -1],
   ];
 
   directions.forEach(([rowDir, colDir]) => {
-    const newRow = row + rowDir;
-    const newCol = col + colDir;
+    let newRow = row + rowDir;
+    let newCol = col + colDir;
 
-    // Обычные ходы
     if (isValidPosition(newRow, newCol) && board[newRow][newCol] === EMPTY) {
-      // Проверяем направление движения для обычных фигур
       if (isKing || (isPlayer && rowDir < 0) || (!isPlayer && rowDir > 0)) {
         moves.push({ row: newRow, col: newCol });
       }
     }
 
-    // Проверка на захваты (прыжки)
-    if (isValidPosition(newRow, newCol) && board[newRow][newCol] !== EMPTY) {
-      const jumpedPiece = board[newRow][newCol];
-      if (jumpedPiece) {
-        // Проверка на null или undefined
-        const isOpponent =
+    // Check for jumps
+    if (isValidPosition(newRow, newCol) && board[newRow][newCol]) {
+      const jumpRow = newRow + rowDir;
+      const jumpCol = newCol + colDir;
+      if (
+        isValidPosition(jumpRow, jumpCol) &&
+        board[jumpRow][jumpCol] === EMPTY
+      ) {
+        const jumpedPiece = board[newRow][newCol];
+        if (
           (isPlayer && (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
-          (!isPlayer &&
-            (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING));
-
-        if (isOpponent) {
-          const jumpRow = newRow + rowDir;
-          const jumpCol = newCol + colDir;
-
-          if (
-            isValidPosition(jumpRow, jumpCol) &&
-            board[jumpRow][jumpCol] === EMPTY
-          ) {
-            jumps.push({
-              row: jumpRow,
-              col: jumpCol,
-              jumpRow: newRow,
-              jumpCol: newCol,
-            });
-          }
+          (!isPlayer && (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
+        ) {
+          jumps.push({
+            row: jumpRow,
+            col: jumpCol,
+            jumpRow: newRow,
+            jumpCol: newCol,
+          });
         }
       }
     }
   });
 
-  // Если есть захваты, только они возвращаются
   return jumps.length > 0 ? jumps : moves;
 };
 
