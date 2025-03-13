@@ -5,15 +5,15 @@ export const createInitialBoard = () => {
     .fill()
     .map(() => Array(BOARD_SIZE).fill(EMPTY));
 
-  // Расставляем шашки на 2-й и 3-й горизонталях для бота (корги)
-  for (let row = 1; row < 3; row++) {
+  // Place pieces on 2nd and 3rd rows for bot (corgi)
+  for (let row = 0; row < 2; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       board[row][col] = BOT;
     }
   }
 
-  // Расставляем шашки на 5-й и 6-й горизонталях для игрока (бигли)
-  for (let row = 5; row < 7; row++) {
+  // Place pieces on 6th and 7th rows for player (beagle)
+  for (let row = 6; row < 8; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       board[row][col] = PLAYER;
     }
