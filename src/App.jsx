@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from "react";
-import beagleImg from "./assets/beagle.webp";
-import beagleKingImg from "./assets/beagle-king.jpg";
-import corgiImg from "./assets/corgi.webp";
-import corgiKingImg from "./assets/corgi-king.jpg";
+
 import { createInitialBoard } from "./boardUtils.js"; // Импортируем функцию
 import {
   GAME_MODES,
@@ -14,15 +11,11 @@ import {
   BOARD_SIZE,
 } from "./constants.js";
 
-import { findBestMove, calculateValidMovesForBoard } from "./gameUtils.js";
+import { findBestMove } from "./gameUtils.js";
 import { Board3D } from "./components/Board3D";
 
 // Main game component
 const App = () => {
-  // Добавим новые состояния
-  const [gameMode, setGameMode] = useState(GAME_MODES.CLASSIC);
-  const [showModeSelect, setShowModeSelect] = useState(false);
-
   const [board, setBoard] = useState(createInitialBoard());
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [playerTurn, setPlayerTurn] = useState(true);
@@ -46,22 +39,6 @@ const App = () => {
       );
     }
   }, [board]);
-
-  // Bot's turn
-  useEffect(() => {
-    if (!playerTurn && !gameOver) {
-      setGameMessage("Корги думает...");
-
-      // Устанавливаем задержку в зависимости от режима
-      const delay = gameMode === GAME_MODES.TURBO ? 200 : 800;
-
-      const botTimer = setTimeout(() => {
-        makeBotMove();
-      }, delay);
-
-      return () => clearTimeout(botTimer);
-    }
-  }, [playerTurn, gameOver, gameMode]); // Добавляем gameMode в зависимости
 
   // Добавьте слушатель событий для изменения полноэкранного режима
   useEffect(() => {
@@ -140,7 +117,7 @@ const App = () => {
     for (let row = 0; row < BOARD_SIZE; row++) {
       for (let col = 0; col < BOARD_SIZE; col++) {
         if (currentPieces.includes(board[row][col])) {
-          const moves = calculateValidMovesForBoard(board, row, col);
+          const moves = calculateValidMoves(row, col);
           if (moves.length > 0) {
             return true;
           }
@@ -150,6 +127,116 @@ const App = () => {
     return false;
   };
 
+  // Calculate valid moves for a piece
+  const calculateValidMoves = (row, col) => {
+    const piece = board[row][col];
+    if (!piece) return [];
+
+    const isKing = piece === PLAYER_KING || piece === BOT_KING;
+    const isPlayer = piece === PLAYER || piece === PLAYER_KING;
+
+    let moves = [];
+    let jumps = [];
+
+    // Направления движения: вверх, вправо, вниз, влево
+    const directions = [
+      [-1, 0], // вверх
+      [0, 1], // вправо
+      [1, 0], // вниз
+      [0, -1], // влево
+    ];
+
+    for (const [rowDir, colDir] of directions) {
+      // Пропускаем ход назад для обычных шашек и взятие назад
+      if (
+        !isKing &&
+        ((isPlayer && rowDir === 1) || (!isPlayer && rowDir === -1))
+      ) {
+        continue;
+      }
+
+      let newRow = row + rowDir;
+      let newCol = col + colDir;
+
+      // Проверяем обычный ход
+      if (
+        newRow >= 0 &&
+        newRow < BOARD_SIZE &&
+        newCol >= 0 &&
+        newCol < BOARD_SIZE &&
+        board[newRow][newCol] === EMPTY
+      ) {
+        // Простые шашки могут ходить только вперед и в стороны
+        if (!isKing && rowDir === (isPlayer ? 1 : -1)) {
+          continue;
+        }
+        moves.push({ row: newRow, col: newCol });
+      }
+
+      // Проверяем взятие
+      if (
+        newRow >= 0 &&
+        newRow < BOARD_SIZE &&
+        newCol >= 0 &&
+        newCol < BOARD_SIZE &&
+        board[newRow][newCol] !== EMPTY
+      ) {
+        const jumpRow = newRow + rowDir;
+        const jumpCol = newCol + colDir;
+
+        if (
+          jumpRow >= 0 &&
+          jumpRow < BOARD_SIZE &&
+          jumpCol >= 0 &&
+          jumpCol < BOARD_SIZE &&
+          board[jumpRow][jumpCol] === EMPTY
+        ) {
+          const jumpedPiece = board[newRow][newCol];
+          // Проверяем, что мы бьем фишку противника
+          if (
+            (isPlayer && (jumpedPiece === BOT || jumpedPiece === BOT_KING)) ||
+            (!isPlayer &&
+              (jumpedPiece === PLAYER || jumpedPiece === PLAYER_KING))
+          ) {
+            // Для простых шашек нельзя бить назад
+            if (!isKing && rowDir === (isPlayer ? 1 : -1)) {
+              continue;
+            }
+            jumps.push({
+              row: jumpRow,
+              col: jumpCol,
+              jumpRow: newRow,
+              jumpCol: newCol,
+            });
+          }
+        }
+      }
+
+      // Для дамок добавляем ходы на несколько клеток
+      if (isKing) {
+        let distance = 2;
+        newRow = row + rowDir * distance;
+        newCol = col + colDir * distance;
+
+        while (
+          newRow >= 0 &&
+          newRow < BOARD_SIZE &&
+          newCol >= 0 &&
+          newCol < BOARD_SIZE &&
+          board[newRow][newCol] === EMPTY
+        ) {
+          moves.push({ row: newRow, col: newCol });
+          distance++;
+          newRow = row + rowDir * distance;
+          newCol = col + colDir * distance;
+        }
+      }
+    }
+
+    // Если есть взятия, возвращаем только их
+    return jumps.length > 0 ? jumps : moves;
+  };
+
   // Check if any jump is available for the current player
   const checkForAnyJump = () => {
     const currentPieces = playerTurn ? [PLAYER, PLAYER_KING] : [BOT, BOT_KING];
@@ -157,7 +244,7 @@ const App = () => {
     for (let row = 0; row < BOARD_SIZE; row++) {
       for (let col = 0; col < BOARD_SIZE; col++) {
         if (currentPieces.includes(board[row][col])) {
-          const moves = calculateValidMovesForBoard(board, row, col);
+          const moves = calculateValidMoves(row, col);
           if (moves.length > 0 && "jumpRow" in moves[0]) {
             return true;
           }
@@ -175,7 +262,7 @@ const App = () => {
     const isPlayerPiece = piece === PLAYER || piece === PLAYER_KING;
 
     if (isPlayerPiece) {
-      const moves = calculateValidMovesForBoard(board, row, col);
+      const moves = calculateValidMoves(row, col);
 
       // Check if there's a mandatory jump
       const jumpAvailable = checkForAnyJump();
@@ -237,10 +324,9 @@ const App = () => {
       setBoard(newBoard);
 
       if (moveInfo && "jumpRow" in moveInfo) {
-        const additionalJumps = calculateValidMovesForBoard(
-          toRow,
-          toCol
-        ).filter((move) => "jumpRow" in move);
+        const additionalJumps = calculateValidMoves(toRow, toCol).filter(
+          (move) => "jumpRow" in move
+        );
 
         if (additionalJumps.length > 0) {
           setSelectedPiece({ row: toRow, col: toCol });
@@ -397,150 +483,6 @@ const App = () => {
     );
   };
 
-  // Добавим функцию для генерации случайных цветов
-  const getRandomColor = () => {
-    const colors = [
-      "red",
-      "blue",
-      "green",
-      "yellow",
-      "purple",
-      "pink",
-      "orange",
-      "teal",
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  // Render a piece
-  const renderPiece = (piece) => {
-    if (!piece) return null;
-
-    let pieceClass = `
-      piece 
-      w-full h-full rounded-full 
-      flex items-center justify-center 
-      transform transition-all duration-200 
-      hover:scale-110 cursor-pointer 
-      shadow-lg hover:shadow-xl
-      animate-[pieceHover_0.2s_ease-in-out]
-    `;
-
-    if (gameMode === GAME_MODES.PARTY_MODE) {
-      pieceClass += " party-mode";
-      // Добавляем случайную задержку анимации для каждой фигуры
-      const delay = Math.random() * 2;
-      pieceClass += ` animate-delay-${Math.floor(delay)}`;
-    }
-
-    let imgSrc = null;
-
-    switch (piece) {
-      case PLAYER:
-        pieceClass += " bg-gradient-to-br from-amber-200 to-amber-400";
-        imgSrc = beagleImg;
-        break;
-      case PLAYER_KING:
-        pieceClass +=
-          " bg-gradient-to-br from-amber-300 to-amber-500 ring-4 ring-yellow-400";
-        imgSrc = beagleKingImg;
-        break;
-      case BOT:
-        pieceClass += " bg-gradient-to-br from-orange-200 to-orange-400";
-        imgSrc = corgiImg;
-        break;
-      case BOT_KING:
-        pieceClass +=
-          " bg-gradient-to-br from-orange-300 to-orange-500 ring-4 ring-yellow-400";
-        imgSrc = corgiKingImg;
-        break;
-      default:
-        return null;
-    }
-
-    return (
-      <div className={`${pieceClass} overflow-clip`}>
-        <img
-          src={imgSrc}
-          alt={piece}
-          className="w-[100%] h-[100%] object-cover drop-shadow-lg transform transition-transform duration-200"
-          draggable="false"
-        />
-      </div>
-    );
-  };
-
-  // Добавим компонент выбора режима
-  const renderModeSelect = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full space-y-6 animate-[appear_0.3s_ease-out]">
-        <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">
-          Выберите режим игры
-        </h2>
-
-        <div className="space-y-4">
-          <button
-            onClick={() => {
-              setGameMode(GAME_MODES.CLASSIC);
-              setShowModeSelect(false);
-              restartGame();
-            }}
-            className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-500 
-                     hover:from-blue-600 hover:to-purple-600 text-white rounded-xl
-                     transform transition-all duration-200 hover:scale-105">
-            🎮 Классический режим
-          </button>
-
-          <button
-            onClick={() => {
-              setGameMode(GAME_MODES.CRAZY_JUMPS);
-              setShowModeSelect(false);
-              restartGame();
-            }}
-            className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-teal-500 
-                     hover:from-green-600 hover:to-teal-600 text-white rounded-xl
-                     transform transition-all duration-200 hover:scale-105">
-            🦘 Сумасшедшие прыжки
-          </button>
-
-          <button
-            onClick={() => {
-              setGameMode(GAME_MODES.PARTY_MODE);
-              setShowModeSelect(false);
-              restartGame();
-            }}
-            className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 
-                     hover:from-pink-600 hover:to-purple-600 text-white rounded-xl
-                     transform transition-all duration-200 hover:scale-105">
-            🎉 Режим вечеринки
-          </button>
-
-          <button
-            onClick={() => {
-              setGameMode(GAME_MODES.TURBO);
-              setShowModeSelect(false);
-              restartGame();
-            }}
-            className="w-full px-6 py-4 bg-gradient-to-r from-red-500 to-orange-500 
-                     hover:from-red-600 hover:to-orange-600 text-white rounded-xl
-                     transform transition-all duration-200 hover:scale-105">
-            ⚡ Турбо режим
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Оптимизируем стили для мобильных устройств
-  const mainContainerClass = `
-    flex flex-col items-center justify-center min-h-screen w-screen
-    ${
-      window.innerWidth < 768
-        ? "bg-gray-100 dark:bg-gray-900"
-        : "bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
-    }
-  `;
-
   // Обновляем разметку в основном return
   return (
     <div
@@ -550,8 +492,6 @@ const App = () => {
       transition-colors duration-300
       
     `}>
-      {showModeSelect && renderModeSelect()}
-
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-8 max-w-4xl mx-auto">
           {!isFullscreen && (
@@ -562,13 +502,6 @@ const App = () => {
                   Корги против Биглей
                 </h1>
                 <div className="flex gap-4">
-                  <button
-                    onClick={() => setShowModeSelect(true)}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 
-                             text-white rounded-lg shadow-lg
-                             transform transition-all duration-200 hover:scale-105">
-                    Сменить режим
-                  </button>
                   <button
                     onClick={toggleFullscreen}
                     className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 

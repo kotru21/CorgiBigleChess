@@ -7,6 +7,12 @@ import {
   EMPTY,
 } from "./constants.js";
 
+// Удаляем импорт calculateValidMovesForBoard, так как определяем её здесь
+// import { calculateValidMovesForBoard } from "./moveUtils.js";
+
+/**
+ * Проверяет состояние игры (победа одного из игроков или отсутствие ходов) для заданной доски.
+ */
 export const checkGameStatusForBoard = (currentBoard) => {
   let botPieces = 0,
     playerPieces = 0;
