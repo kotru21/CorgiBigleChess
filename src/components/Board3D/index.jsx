@@ -39,9 +39,23 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
             position={[row - 3.5, -0.099, col - 3.5]}
             rotation={[-Math.PI / 2, 0, 0]}
             receiveShadow
-            onClick={() => (isValidMove ? onPieceSelect(row, col) : null)}
-            onPointerOver={() => setHoveredSquare({ row, col })}
-            onPointerOut={() => setHoveredSquare(null)}>
+            onClick={(e) => {
+              // Четкое блокирование всплытия события
+              e.stopPropagation();
+
+              // Вызываем onPieceSelect только если это допустимый ход
+              if (isValidMove) {
+                onPieceSelect(row, col);
+              }
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              setHoveredSquare({ row, col });
+            }}
+            onPointerOut={(e) => {
+              e.stopPropagation();
+              setHoveredSquare(null);
+            }}>
             <planeGeometry args={[1, 1]} />
             <meshStandardMaterial
               color={color}

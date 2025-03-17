@@ -10,7 +10,6 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   const [hovered, setHovered] = useState(false);
   const { animateHeight, currentHeight } = usePieceAnimations(isSelected);
 
-  // Загружаем 3D модели
   const { scene: modelScene } = useGLTF(`/models/${type}.glb`);
   const { scene: crownScene } = useGLTF("/models/crown.glb");
 
@@ -31,14 +30,34 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   // Масштаб для разных типов собак
   const scale = type === "corgi" ? 0.4 : 0.35;
 
+  // Создаем отдельный обработчик клика, который будет использоваться только на hitbox
+  const handleClickEvent = (e) => {
+    e.stopPropagation();
+    onClick();
+  };
+
   return (
     <group
       position={[position[0], position[1], position[2]]}
       ref={groupRef}
-      onClick={onClick}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
       scale={hovered || isSelected ? scale * 1.1 : scale}>
+      {/*  hitbox */}
+      <mesh
+        onClick={handleClickEvent}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation();
+          setHovered(false);
+        }}
+        visible={false} // невидимый, но обнаруживаемый для кликов
+        position={[0, 0.5, 0]}>
+        <boxGeometry args={[0.8, 1, 0.8]} />
+        <meshBasicMaterial transparent opacity={0.0} />
+      </mesh>
+
       {/* Тень под фигурой */}
       <mesh
         position={[0, -0.08, 0]}
@@ -52,7 +71,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
         />
       </mesh>
 
-      {/* Модель собаки */}
+      {/* Модель собаки - визуальная часть, не реагирующая на события */}
       <primitive
         scale={3}
         object={modelScene.clone()}
@@ -83,7 +102,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   );
 }
 
-// Предзагрузка моделей для оптимизации
+// Предзагрузка моделей
 useGLTF.preload("/models/beagle.glb");
 useGLTF.preload("/models/corgi.glb");
 useGLTF.preload("/models/crown.glb");
