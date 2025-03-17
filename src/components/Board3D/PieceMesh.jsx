@@ -3,11 +3,16 @@ import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import React from "react";
 import { usePieceAnimations } from "../../hooks/usePieceAnimations";
+import { useGLTF } from "@react-three/drei";
 
 export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   const groupRef = useRef();
   const [hovered, setHovered] = useState(false);
   const { animateHeight, currentHeight } = usePieceAnimations(isSelected);
+
+  // Загружаем 3D модели
+  const { scene: modelScene } = useGLTF(`/models/${type}.glb`);
+  const { scene: crownScene } = useGLTF("/models/crown.glb");
 
   // Анимация при наведении и выборе
   useFrame(() => {
@@ -23,6 +28,9 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   // Глубина теней зависит от статуса фигуры
   const shadowOpacity = isSelected ? 0.4 : hovered ? 0.3 : 0.2;
 
+  // Масштаб для разных типов собак
+  const scale = type === "corgi" ? 0.4 : 0.35;
+
   return (
     <group
       position={[position[0], position[1], position[2]]}
@@ -30,7 +38,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
       onClick={onClick}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      scale={hovered || isSelected ? 1.1 : 1}>
+      scale={hovered || isSelected ? scale * 1.1 : scale}>
       {/* Тень под фигурой */}
       <mesh
         position={[0, -0.08, 0]}
@@ -44,58 +52,24 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
         />
       </mesh>
 
-      {/* Тело фигуры */}
-      <mesh position={[0, 0.1, 0]} castShadow>
-        <cylinderGeometry args={[0.35, 0.35, 0.1, 32]} />
-        <meshStandardMaterial
-          color={type === "corgi" ? "#FFA500" : "#FFD700"}
-          metalness={0.7}
-          roughness={0.2}
-        />
-      </mesh>
-
-      {/* Детали фигуры в зависимости от типа */}
-      {type === "corgi" ? (
-        <mesh position={[0, 0.15, 0.2]} castShadow>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#FF8C00" />
-        </mesh>
-      ) : (
-        <mesh position={[0, 0.15, 0.2]} castShadow>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#DAA520" />
-        </mesh>
-      )}
+      {/* Модель собаки */}
+      <primitive
+        scale={3}
+        object={modelScene.clone()}
+        position={[0, -0.1, 0]}
+        castShadow
+        receiveShadow
+      />
 
       {/* Корона для королей */}
       {isKing && (
-        <group position={[0, 0.2, 0]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.25, 0.3, 0.1, 32]} />
-            <meshStandardMaterial
-              color="#FFD700"
-              metalness={0.9}
-              roughness={0.1}
-            />
-          </mesh>
-          {[0, 1, 2, 3].map((i) => (
-            <mesh
-              key={i}
-              position={[
-                0.15 * Math.cos((i * Math.PI) / 2),
-                0.1,
-                0.15 * Math.sin((i * Math.PI) / 2),
-              ]}
-              castShadow>
-              <coneGeometry args={[0.06, 0.12, 4]} />
-              <meshStandardMaterial
-                color="#FFD700"
-                metalness={0.9}
-                roughness={0.1}
-              />
-            </mesh>
-          ))}
-        </group>
+        <primitive
+          object={crownScene.clone()}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 2, 0]}
+          scale={0.03}
+          castShadow
+        />
       )}
 
       {/* Подсветка при наведении */}
@@ -108,3 +82,8 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
     </group>
   );
 }
+
+// Предзагрузка моделей для оптимизации
+useGLTF.preload("/models/beagle.glb");
+useGLTF.preload("/models/corgi.glb");
+useGLTF.preload("/models/crown.glb");
