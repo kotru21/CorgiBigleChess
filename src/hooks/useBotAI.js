@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useGame } from "../contexts/GameContext.jsx";
-import { findBestMove } from "../services/AIservice";
+import { getBestMove } from "../services/AIservice";
 import { movePiece, checkGameStatus } from "../services/BoardService";
 import { PLAYER, BOT, GAME_MODES } from "../models/Constants";
 
@@ -29,7 +29,7 @@ export function useBotAI() {
       const depth = gameMode === GAME_MODES.TURBO ? 4 : 3;
 
       // Находим лучший ход
-      const bestMove = findBestMove(board, depth);
+      const bestMove = getBestMove(board, depth); // Изменено с findBestMove на getBestMove
 
       if (bestMove) {
         // Выполняем ход

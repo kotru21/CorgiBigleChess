@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Board3D } from "./Board3D";
 import { useGame } from "../contexts/GameContext.jsx";
-import { calculateValidMoves } from "../services/MoveService";
+import { getValidMoves, executeMove } from "../services/MoveService";
 import { movePiece, checkGameStatus } from "../services/BoardService";
 import { PLAYER, BOT, PLAYER_KING, BOT_KING } from "../models/Constants";
 
@@ -40,25 +40,31 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
       );
 
       if (isValidMove) {
-        // Выполняем ход
-        const newBoard = movePiece(
+        // Находим информацию о ходе (для определения взятых фигур)
+        const moveInfo = validMoves.find(
+          (move) => move.row === row && move.col === col
+        );
+        const captured = moveInfo.captured || [];
+
+        // Выполняем ход с учетом взятых фигур
+        const newBoard = executeMove(
           board,
           selectedPiece.row,
           selectedPiece.col,
           row,
-          col
+          col,
+          captured
         );
+
         setBoard(newBoard);
 
-        // Проверяем, есть ли возможность для еще одного прыжка той же фигурой
-        const jumpDistance = Math.abs(selectedPiece.row - row) === 2;
-        if (jumpDistance) {
-          const potentialJumps = calculateValidMoves(newBoard, row, col);
-          const hasMoreJumps = potentialJumps.some((move) => "jumpRow" in move);
+        // Проверяем, есть ли возможность для еще одного взятия той же фигурой
+        if (captured.length > 0) {
+          const { captures } = getValidMoves(newBoard, row, col);
 
-          if (hasMoreJumps) {
+          if (captures.length > 0) {
             setSelectedPiece({ row, col });
-            setValidMoves(potentialJumps.filter((move) => "jumpRow" in move));
+            setValidMoves(captures);
             return;
           }
         }
@@ -76,9 +82,15 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
         }
       } else if (isPlayerPiece) {
         // Если выбрана другая фигура игрока, выбираем ее
-        const moves = calculateValidMoves(board, row, col);
+        const { moves, captures } = getValidMoves(board, row, col);
         setSelectedPiece({ row, col });
-        setValidMoves(moves);
+
+        // Если есть возможность взятия, показываем только взятия
+        if (captures.length > 0) {
+          setValidMoves(captures);
+        } else {
+          setValidMoves(moves);
+        }
       } else {
         // Если выбрана пустая клетка или фигура бота, сбрасываем выбор
         setSelectedPiece(null);
@@ -86,9 +98,15 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
       }
     } else if (isPlayerPiece) {
       // Выбираем фигуру игрока
-      const moves = calculateValidMoves(board, row, col);
+      const { moves, captures } = getValidMoves(board, row, col);
       setSelectedPiece({ row, col });
-      setValidMoves(moves);
+
+      // Если есть возможность взятия, показываем только взятия
+      if (captures.length > 0) {
+        setValidMoves(captures);
+      } else {
+        setValidMoves(moves);
+      }
     }
   };
 

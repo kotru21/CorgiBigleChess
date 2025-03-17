@@ -1,26 +1,19 @@
-import {
-  BOARD_SIZE,
-  EMPTY,
-  BOT,
-  PLAYER,
-  BOT_KING,
-  PLAYER_KING,
-} from "../models/Constants";
+import { BOARD_SIZE, BOT, PLAYER, EMPTY } from "../models/Constants";
 
 export const createInitialBoard = () => {
   const board = Array(BOARD_SIZE)
     .fill()
     .map(() => Array(BOARD_SIZE).fill(EMPTY));
 
-  // расстановка шашек бота (корги)
-  for (let row = 1; row < 3; row++) {
+  // Расстановка шашек бота (корги) - 16 шашек в два ряда
+  for (let row = 0; row < 2; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       board[row][col] = BOT;
     }
   }
 
-  // расстановка шашек игрока (бигли)
-  for (let row = 5; row < 7; row++) {
+  // Расстановка шашек игрока (бигли) - 16 шашек в два ряда
+  for (let row = BOARD_SIZE - 2; row < BOARD_SIZE; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       board[row][col] = PLAYER;
     }

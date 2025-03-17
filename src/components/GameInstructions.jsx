@@ -9,7 +9,7 @@ export function GameInstructions() {
         className="flex justify-between items-center w-full"
         onClick={() => setExpanded(!expanded)}>
         <h2 className="text-2xl font-bold text-left bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-          Как играть
+          Как играть в Турецкие Шашки
         </h2>
         <span className="text-2xl transform transition-transform duration-300">
           {expanded ? "−" : "+"}
@@ -25,10 +25,17 @@ export function GameInstructions() {
                 Вы играете за биглей (золотые фигуры), против корги (оранжевые
                 фигуры).
               </li>
-              <li>Шашки двигаются по диагонали на одну клетку вперёд.</li>
               <li>
-                Дамка (с короной) может двигаться на одну клетку в любом
-                направлении.
+                В турецких шашках фигуры двигаются по горизонтали и вертикали, а
+                не по диагонали.
+              </li>
+              <li>
+                В начальной позиции у каждого игрока по 16 шашек, расположенных
+                в два ряда.
+              </li>
+              <li>
+                Дамка (с короной) может ходить на любое количество клеток по
+                горизонтали, вертикали и диагонали.
               </li>
               <li>
                 Если рядом с вашей шашкой стоит шашка соперника, за которой есть
@@ -47,7 +54,7 @@ export function GameInstructions() {
             <ul className="list-disc pl-5 space-y-2">
               <li>
                 <span className="font-semibold">Классический</span> -
-                стандартные правила игры в шашки.
+                стандартные правила игры в турецкие шашки.
               </li>
               <li>
                 <span className="font-semibold">Безумные прыжки</span> - можно
