@@ -1,4 +1,4 @@
-import { Suspense, useState, useRef } from "react";
+import { Suspense, useState, useRef, useMemo } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
@@ -6,13 +6,18 @@ import {
   Environment,
   ContactShadows,
   useTexture,
+  Cloud,
+  Sky,
+  Sparkles,
+  useHelper,
+  Shadow,
 } from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
 import React from "react";
 import { EMPTY } from "../../models/Constants";
 import * as THREE from "three";
 
-//компонент доски
+// Компонент доски
 function Board({ renderBoardSquares }) {
   // Загружаем текстуры дерева из локальных файлов
   const woodTextures = useTexture({
@@ -61,6 +66,244 @@ function Board({ renderBoardSquares }) {
   );
 }
 
+// Солнце с эффектом свечения
+function Sun() {
+  const sunPosition = [100, 100, -100]; // Позиция солнца
+
+  return (
+    <group position={sunPosition}>
+      {/* Основной диск солнца */}
+      <mesh>
+        <sphereGeometry args={[15, 32, 32]} />
+        <meshBasicMaterial color="#FDB813" />
+      </mesh>
+
+      {/* Внешнее свечение */}
+      <Sparkles
+        count={50}
+        scale={[30, 30, 30]}
+        size={6}
+        speed={0.3}
+        color="#FFFFE0"
+        opacity={0.7}
+      />
+
+      {/* Лучи света от солнца */}
+      <directionalLight
+        position={[0, 0, 0]}
+        intensity={3}
+        color="#FFFACD"
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={500}
+        shadow-camera-left={-100}
+        shadow-camera-right={100}
+        shadow-camera-top={100}
+        shadow-camera-bottom={-100}
+      />
+    </group>
+  );
+}
+
+// Улучшенный компонент для динамической генерации облаков
+function EnhancedClouds({ count = 80 }) {
+  // Генерируем облака только один раз с помощью useMemo
+  const clouds = useMemo(() => {
+    // Функция для генерации случайного числа в диапазоне
+    const randomRange = (min, max) => Math.random() * (max - min) + min;
+
+    // Функция для генерации случайного целого числа
+    const randomInt = (min, max) => Math.floor(randomRange(min, max));
+
+    // Типы облаков с разными характеристиками
+    const cloudTypes = [
+      // Кучевые большие облака
+      {
+        args: [randomRange(8, 15), randomRange(4, 7), randomRange(2, 4)],
+        width: randomRange(50, 700),
+        depth: randomRange(2, 4),
+        segments: randomInt(15, 25),
+        opacity: randomRange(0.7, 0.9),
+        speed: randomRange(0.05, 0.15),
+        color: "#ffffff",
+      },
+      // Слоистые облака
+      {
+        args: [randomRange(10, 20), randomRange(2, 4), randomRange(1, 2)],
+        width: randomRange(70, 710),
+        depth: randomRange(1, 2),
+        segments: randomInt(12, 18),
+        opacity: randomRange(0.5, 0.7),
+        speed: randomRange(0.03, 0.1),
+        color: "#f5f5f5",
+      },
+      // Перистые облака (высокие и тонкие)
+      {
+        args: [randomRange(6, 12), randomRange(1.5, 3), randomRange(0.8, 1.5)],
+        width: randomRange(60, 90),
+        depth: randomRange(0.8, 1.5),
+        segments: randomInt(8, 15),
+        opacity: randomRange(0.3, 0.5),
+        speed: randomRange(0.08, 0.2),
+        color: "#fafafa",
+      },
+      // Грозовые облака (более темные и плотные)
+      {
+        args: [randomRange(9, 18), randomRange(5, 8), randomRange(2.5, 4)],
+        width: randomRange(60, 90),
+        depth: randomRange(3, 5),
+        segments: randomInt(18, 28),
+        opacity: randomRange(0.6, 0.8),
+        speed: randomRange(0.04, 0.12),
+        color: "#f0f0f0",
+      },
+    ];
+
+    // Зоны расположения облаков
+    const positions = [
+      // Передняя область (Z положительная)
+      {
+        minX: -120,
+        maxX: 120,
+        minY: -5,
+        maxY: 25,
+        minZ: 35,
+        maxZ: 120,
+        count: Math.floor(count * 0.3),
+        heightVariation: true, // Переменная высота
+      },
+      // Задняя область (Z отрицательная)
+      {
+        minX: -120,
+        maxX: 120,
+        minY: -5,
+        maxY: 25,
+        minZ: -120,
+        maxZ: -35,
+        count: Math.floor(count * 0.3),
+        heightVariation: true,
+      },
+      // Левая область (X отрицательная)
+      {
+        minX: -120,
+        maxX: -35,
+        minY: -5,
+        maxY: 25,
+        minZ: -80,
+        maxZ: 80,
+        count: Math.floor(count * 0.2),
+        heightVariation: true,
+      },
+      // Правая область (X положительная)
+      {
+        minX: 35,
+        maxX: 120,
+        minY: -5,
+        maxY: 25,
+        minZ: -80,
+        maxZ: 80,
+        count: Math.floor(count * 0.2),
+        heightVariation: true,
+      },
+      // Высокие дальние облака (фон)
+      {
+        minX: -150,
+        maxX: 150,
+        minY: 30,
+        maxY: 60,
+        minZ: -150,
+        maxZ: 150,
+        count: Math.floor(count * 0.3),
+        heightVariation: false,
+      },
+    ];
+
+    // Генерируем группы облаков для каждой зоны
+    return positions.flatMap((zone) => {
+      return Array.from({ length: zone.count }).map((_, i) => {
+        // Выбираем случайный тип облака
+        const cloudType = cloudTypes[randomInt(0, cloudTypes.length)];
+
+        // Определяем высоту с учетом флага вариации
+        const y = zone.heightVariation
+          ? randomRange(zone.minY, zone.maxY)
+          : randomRange(zone.minY, zone.maxY) + Math.sin(i * 0.5) * 5; // Добавляем синусоиду для более плавного распределения
+
+        // Параметры облаков с учетом выбранного типа
+        const position = [
+          randomRange(zone.minX, zone.maxX),
+          y,
+          randomRange(zone.minZ, zone.maxZ),
+        ];
+
+        // Насколько далеко от центра, тем меньше непрозрачность
+        const distanceFromCenter = Math.sqrt(
+          position[0] * position[0] + position[2] * position[2]
+        );
+        const fadeByDistance = Math.max(0, 1 - distanceFromCenter / 150);
+
+        // Финальная непрозрачность с учетом расстояния
+        const opacity = cloudType.opacity * fadeByDistance;
+
+        // Размер облака с вариациями
+        const width = cloudType.width * (0.7 + Math.random() * 0.6);
+
+        // Вращение для разнообразия
+        const rotation = [0, randomRange(0, Math.PI * 2), 0];
+
+        return (
+          <group
+            key={`cloud-${i}-${zone.minX}`}
+            position={position}
+            rotation={rotation}>
+            <Cloud
+              args={cloudType.args}
+              opacity={opacity}
+              speed={cloudType.speed}
+              width={width}
+              depth={cloudType.depth}
+              segments={cloudType.segments}
+              color={cloudType.color}
+            />
+          </group>
+        );
+      });
+    });
+  }, [count]); // Зависимость только от количества облаков
+
+  return <group>{clouds}</group>;
+}
+
+// Компонент для реалистичного неба с динамическими облаками и солнцем
+function SkyWithCloudsAndSun() {
+  const skyRef = useRef();
+
+  return (
+    <>
+      {/* Настраиваем голубое небо с правильными параметрами */}
+      <Sky
+        ref={skyRef}
+        distance={450000}
+        sunPosition={[100, 100, -100]} // Совпадает с положением солнца
+        inclination={0.6}
+        azimuth={0.25}
+        rayleigh={0.15} // Меньшее значение для более голубого неба
+        turbidity={6} // Меньше для более чистого неба
+        mieCoefficient={0.003}
+        mieDirectionalG={0.9}
+        exposure={1.5} // Увеличиваем яркость
+      />
+
+      {/* Добавляем видимое солнце */}
+      <Sun />
+
+      {/* Улучшенные облака */}
+      <EnhancedClouds count={100} />
+    </>
+  );
+}
+
 function Renderer() {
   const { gl } = useThree();
 
@@ -74,11 +317,11 @@ function Renderer() {
   return null;
 }
 
-// Упрощенное окружение
+// Улучшенное окружение
 function SimpleEnvironment() {
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.8} color="#f5f9ff" />
       <directionalLight
         position={[5, 10, 5]}
         intensity={1.0}
@@ -86,8 +329,9 @@ function SimpleEnvironment() {
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
         shadow-camera-far={15}
+        color="#ffffff"
       />
-      <pointLight position={[-5, 5, -5]} intensity={0.5} color="#f0f0ff" />
+      <pointLight position={[-5, 5, -5]} intensity={0.5} color="#f0f8ff" />
     </>
   );
 }
@@ -193,6 +437,34 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
     return squares;
   };
 
+  // Отдельная функция для рендеринга фигур
+  const renderPieces = useMemo(() => {
+    return board.map((row, rowIndex) =>
+      row.map((cell, colIndex) => {
+        if (cell === EMPTY) return null;
+
+        // Определяем тип фигуры и является ли она королем
+        const type = cell.includes("beagle") ? "beagle" : "corgi";
+        const isKing = cell.includes("-king");
+
+        return (
+          <PieceMesh
+            key={`piece-${rowIndex}-${colIndex}`}
+            type={type}
+            isKing={isKing}
+            position={[rowIndex - 3.5, 0, colIndex - 3.5]}
+            onClick={() => onPieceSelect(rowIndex, colIndex)}
+            isSelected={
+              selectedPiece &&
+              selectedPiece.row === rowIndex &&
+              selectedPiece.col === colIndex
+            }
+          />
+        );
+      })
+    );
+  }, [board, selectedPiece, onPieceSelect]); // Зависит только от изменений доски и выбора
+
   // рендеринг сцены
   return (
     <Canvas
@@ -202,7 +474,6 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
       gl={{
         antialias: true,
         powerPreference: "high-performance",
-        alpha: false, // повышает производительность
       }}>
       <PerspectiveCamera makeDefault position={[0, 5, 7]} fov={50} />
       <OrbitControls
@@ -212,9 +483,11 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
         maxDistance={12}
         minDistance={5}
       />
-
       <Renderer />
       <SimpleEnvironment />
+
+      {/* Улучшенный компонент неба с облаками и солнцем */}
+      <SkyWithCloudsAndSun />
 
       <Suspense fallback={null}>
         <Board renderBoardSquares={renderBoardSquares} />
@@ -230,33 +503,11 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           resolution={256}
         />
 
-        {/* Фигуры */}
-        {board.map((row, rowIndex) =>
-          row.map((cell, colIndex) => {
-            if (cell === EMPTY) return null;
-
-            // Определяем тип фигуры и является ли она королем
-            const type = cell.includes("beagle") ? "beagle" : "corgi";
-            const isKing = cell.includes("-king");
-
-            return (
-              <PieceMesh
-                key={`piece-${rowIndex}-${colIndex}`}
-                type={type}
-                isKing={isKing}
-                position={[rowIndex - 3.5, 0, colIndex - 3.5]}
-                onClick={() => onPieceSelect(rowIndex, colIndex)}
-                isSelected={
-                  selectedPiece &&
-                  selectedPiece.row === rowIndex &&
-                  selectedPiece.col === colIndex
-                }
-              />
-            );
-          })
-        )}
+        {/* Мемоизированные фигуры */}
+        {renderPieces}
       </Suspense>
 
+      {/* Настраиваем окружение с более солнечным пресетом */}
       <Environment preset="sunset" intensity={0.2} />
     </Canvas>
   );
