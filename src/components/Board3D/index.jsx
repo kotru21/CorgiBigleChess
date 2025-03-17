@@ -3,19 +3,18 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
 import React from "react";
-import { PLAYER, BOT, PLAYER_KING, BOT_KING, EMPTY } from "../constants.js";
+import { EMPTY } from "../../models/Constants";
 
 export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
   const [hoveredSquare, setHoveredSquare] = useState(null);
 
-  // Создаем клетки доски
+  // Рендер клеток доски
   const renderBoardSquares = () => {
     const squares = [];
+
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const isEven = (row + col) % 2 === 0;
-
-        // Определяем, является ли клетка выбранной или доступным ходом
         const isSelected =
           selectedPiece &&
           selectedPiece.row === row &&
@@ -28,15 +27,11 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           hoveredSquare.row === row &&
           hoveredSquare.col === col;
 
-        // Выбираем цвет клетки
+        // Определяем цвет клетки
         let color = isEven ? "#553311" : "#8B4513";
-        if (isSelected) {
-          color = "#66BB66"; // Зеленый для выбранной фигуры
-        } else if (isValidMove) {
-          color = "#6699FF"; // Синий для доступных ходов
-        } else if (isHovered && !isEven) {
-          color = "#AA6633"; // Светлее для наведения на темные клетки
-        }
+        if (isSelected) color = "#66BB66";
+        else if (isValidMove) color = "#6699FF";
+        else if (isHovered && !isEven) color = "#AA6633";
 
         squares.push(
           <mesh
@@ -59,23 +54,8 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
         );
       }
     }
-    return squares;
-  };
 
-  // Преобразуем константы шашек в формат, понятный для PieceMesh
-  const getPieceType = (piece) => {
-    switch (piece) {
-      case PLAYER:
-        return { type: "beagle", isKing: false };
-      case PLAYER_KING:
-        return { type: "beagle", isKing: true };
-      case BOT:
-        return { type: "corgi", isKing: false };
-      case BOT_KING:
-        return { type: "corgi", isKing: true };
-      default:
-        return null;
-    }
+    return squares;
   };
 
   return (
@@ -98,9 +78,8 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
       />
       <directionalLight position={[-5, 5, -5]} intensity={0.5} />
 
-      {/* Доска */}
+      {/* Основа доски */}
       <group>
-        {/* Основание доски */}
         <mesh position={[0, -0.2, 0]} receiveShadow>
           <boxGeometry args={[8.2, 0.2, 8.2]} />
           <meshStandardMaterial
@@ -109,7 +88,6 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
             roughness={0.8}
           />
         </mesh>
-        {/* Клетки доски */}
         {renderBoardSquares()}
       </group>
 
@@ -119,14 +97,15 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           row.map((cell, colIndex) => {
             if (cell === EMPTY) return null;
 
-            const pieceInfo = getPieceType(cell);
-            if (!pieceInfo) return null;
+            // Определяем тип фигуры и является ли она королем
+            const type = cell.includes("beagle") ? "beagle" : "corgi";
+            const isKing = cell.includes("-king");
 
             return (
               <PieceMesh
                 key={`piece-${rowIndex}-${colIndex}`}
-                type={pieceInfo.type}
-                isKing={pieceInfo.isKing}
+                type={type}
+                isKing={isKing}
                 position={[rowIndex - 3.5, 0, colIndex - 3.5]}
                 onClick={() => onPieceSelect(rowIndex, colIndex)}
                 isSelected={
