@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
@@ -8,148 +8,79 @@ import {
   useTexture,
   Sky,
   Stars,
-  useGLTF,
+  AdaptiveDpr,
+  PerformanceMonitor,
 } from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
 import React from "react";
 import { EMPTY } from "../../models/Constants";
 import * as THREE from "three";
 
-//компонент доски
-function Board({ renderBoardSquares }) {
-  // Загружаем текстуры дерева из локальных файлов
-  const woodTextures = useTexture({
-    map: "/textures/wood_color.png",
-    normalMap: "/textures/wood_normal.png",
-    roughnessMap: "/textures/wood_roughness.jpg",
-  });
+// Хук для определения мобильного устройства
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Настраиваем текстуру для повторения
-  React.useEffect(() => {
-    Object.values(woodTextures).forEach((texture) => {
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(4, 4);
-    });
-  }, [woodTextures]);
+  useEffect(() => {
+    const checkIsMobile = () => {
+      return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        ) || window.innerWidth < 768
+      );
+    };
 
-  // Создаём материал с текстурой дерева
-  const woodMaterial = new THREE.MeshStandardMaterial({
-    ...woodTextures,
-    roughness: 0.8,
-    metalness: 0.1,
-    color: "#8B5A2B",
-  });
+    setIsMobile(checkIsMobile());
 
-  return (
-    <group>
-      <mesh position={[0, -0.1, 4.25]} receiveShadow castShadow>
-        <boxGeometry args={[9, 0.3, 0.5]} />
-        <primitive object={woodMaterial} attach="material" />
-      </mesh>
-      <mesh position={[0, -0.1, -4.25]} receiveShadow castShadow>
-        <boxGeometry args={[9, 0.3, 0.5]} />
-        <primitive object={woodMaterial} attach="material" />
-      </mesh>
-      <mesh position={[4.25, -0.1, 0]} receiveShadow castShadow>
-        <boxGeometry args={[0.5, 0.3, 9]} />
-        <primitive object={woodMaterial} attach="material" />
-      </mesh>
-      <mesh position={[-4.25, -0.1, 0]} receiveShadow castShadow>
-        <boxGeometry args={[0.5, 0.3, 9]} />
-        <primitive object={woodMaterial} attach="material" />
-      </mesh>
+    const handleResize = () => {
+      setIsMobile(checkIsMobile());
+    };
 
-      {renderBoardSquares()}
-    </group>
-  );
-}
-
-function Renderer() {
-  const { gl } = useThree();
-
-  React.useEffect(() => {
-    //настройки рендеринга
-    gl.shadowMap.enabled = true;
-    gl.shadowMap.type = THREE.PCFSoftShadowMap;
-    gl.outputEncoding = THREE.sRGBEncoding;
-  }, [gl]);
-
-  return null;
-}
-
-// Компонент для создания стилизованного облака из нескольких перекрывающихся плоскостей
-function CloudPlane({
-  position,
-  rotation = [0, 0, 0],
-  scale = 1,
-  opacity = 0.7,
-}) {
-  // Создаем текстуру для облака
-  const cloudTexture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext("2d");
-
-    // Заполняем градиентом от белого к прозрачному
-    const gradient = ctx.createRadialGradient(64, 64, 10, 64, 64, 64);
-    gradient.addColorStop(0, "rgba(255, 255, 255, 0.9)");
-    gradient.addColorStop(0.4, "rgba(255, 255, 255, 0.6)");
-    gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.3)");
-    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 128, 128);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  return isMobile;
+}
+
+// Компонент для настройки рендеринга в зависимости от производительности
+function AdaptiveRenderer() {
+  const { gl } = useThree();
+  const [degraded, setDegraded] = useState(false);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    // Базовые настройки рендеринга
+    gl.shadowMap.enabled = !isMobile;
+    gl.shadowMap.type = isMobile
+      ? THREE.BasicShadowMap
+      : THREE.PCFSoftShadowMap;
+    gl.outputEncoding = THREE.sRGBEncoding;
+
+    // Дополнительные оптимизации для мобильных устройств
+    if (isMobile) {
+      gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    }
+  }, [gl, isMobile]);
+
   return (
-    <group position={position} rotation={rotation} scale={scale}>
-      {/* Создаем несколько перекрывающихся плоскостей для облака */}
-      <mesh position={[0, 0, 0]}>
-        <planeGeometry args={[10, 6]} />
-        <meshBasicMaterial
-          map={cloudTexture}
-          transparent
-          opacity={opacity}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[2, 1, 1]} rotation={[0.2, 0.3, 0.1]}>
-        <planeGeometry args={[8, 5]} />
-        <meshBasicMaterial
-          map={cloudTexture}
-          transparent
-          opacity={opacity * 0.8}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[-3, -0.5, 0.6]} rotation={[-0.1, -0.2, 0]}>
-        <planeGeometry args={[7, 4]} />
-        <meshBasicMaterial
-          map={cloudTexture}
-          transparent
-          opacity={opacity * 0.7}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-    </group>
+    <PerformanceMonitor
+      onDecline={() => {
+        setDegraded(true);
+      }}>
+      {degraded && <AdaptiveDpr pixelated />}
+    </PerformanceMonitor>
   );
 }
 
-// Объемные стилизованные облака с использованием группы сфер
-function StylizedCloud({ position, scale = 1, intensity = 1 }) {
+// Оптимизированные компоненты для создания облаков и ландшафта
+function OptimizedCloud({ position, scale = 1, intensity = 1, isMobile }) {
+  // Создаем упрощенную геометрию для мобильных устройств
+  const segments = isMobile ? 8 : 16;
+
   return (
     <group position={position} scale={scale}>
-      {/* Главная большая сфера облака */}
       <mesh>
-        <sphereGeometry args={[2, 16, 16]} />
+        <sphereGeometry args={[2, segments, segments]} />
         <meshStandardMaterial
           color="#ffffff"
           transparent
@@ -160,312 +91,55 @@ function StylizedCloud({ position, scale = 1, intensity = 1 }) {
         />
       </mesh>
 
-      {/* Дополнительные сферы для создания объемности */}
-      <mesh position={[1.5, 0.5, 0]}>
-        <sphereGeometry args={[1.5, 16, 16]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.85 * intensity}
-          emissive="#ffffff"
-          emissiveIntensity={0.03}
-          roughness={1}
-        />
-      </mesh>
+      {/* Уменьшаем количество дополнительных сфер на мобильных */}
+      {(!isMobile || Math.random() > 0.5) && (
+        <mesh position={[1.5, 0.5, 0]}>
+          <sphereGeometry args={[1.5, segments, segments]} />
+          <meshStandardMaterial
+            color="#ffffff"
+            transparent
+            opacity={0.85 * intensity}
+            emissive="#ffffff"
+            emissiveIntensity={0.03}
+            roughness={1}
+          />
+        </mesh>
+      )}
 
-      <mesh position={[-1.7, 0.2, 0.4]}>
-        <sphereGeometry args={[1.7, 16, 16]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.8 * intensity}
-          emissive="#ffffff"
-          emissiveIntensity={0.04}
-          roughness={1}
-        />
-      </mesh>
-
-      <mesh position={[0.3, -0.8, 0.7]}>
-        <sphereGeometry args={[1.3, 16, 16]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.75 * intensity}
-          emissive="#ffffff"
-          emissiveIntensity={0.02}
-          roughness={1}
-        />
-      </mesh>
-
-      <mesh position={[-0.5, 1.2, -0.3]}>
-        <sphereGeometry args={[1.2, 16, 16]} />
-        <meshStandardMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.7 * intensity}
-          emissive="#ffffff"
-          emissiveIntensity={0.02}
-          roughness={1}
-        />
-      </mesh>
+      {(!isMobile || Math.random() > 0.7) && (
+        <mesh position={[-1.7, 0.2, 0.4]}>
+          <sphereGeometry args={[1.7, segments, segments]} />
+          <meshStandardMaterial
+            color="#ffffff"
+            transparent
+            opacity={0.8 * intensity}
+            emissive="#ffffff"
+            emissiveIntensity={0.04}
+            roughness={1}
+          />
+        </mesh>
+      )}
     </group>
   );
 }
 
-// Создаем текстурированный ландшафт вместо плоской земли
-function StylizedLandscape() {
-  // Загружаем текстуры для земли
-  const groundTexture = useTexture({
-    map: "/textures/ground_color.jpg",
-    normalMap: "/textures/ground_normal.jpg",
-    roughnessMap: "/textures/ground_roughness.jpg",
-    aoMap: "/textures/ground_ao.jpg",
-  });
-
-  // Конфигурируем текстуры
-  React.useEffect(() => {
-    Object.values(groundTexture).forEach((texture) => {
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(30, 30);
-    });
-  }, [groundTexture]);
-
-  return (
-    <group position={[0, -40, 0]}>
-      {/* Основная земля - большая сфера, создающая горизонт */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <sphereGeometry
-          args={[500, 64, 64, 0, Math.PI * 2, 0, Math.PI * 0.5]}
-        />
-        <meshStandardMaterial
-          {...groundTexture}
-          color="#3a5e30"
-          roughness={1}
-          metalness={0.05}
-        />
-      </mesh>
-
-      {/* Дальние холмы */}
-      <mesh position={[30, 15, -120]} rotation={[-0.1, 0.3, 0]}>
-        <boxGeometry args={[80, 30, 60]} />
-        <meshStandardMaterial color="#2d4c2a" roughness={1} metalness={0} />
-      </mesh>
-
-      <mesh position={[-90, 20, -150]} rotation={[-0.05, -0.2, 0.1]}>
-        <boxGeometry args={[120, 40, 80]} />
-        <meshStandardMaterial color="#27442b" roughness={1} metalness={0} />
-      </mesh>
-    </group>
-  );
-}
-
-// Фон сцены с красивыми элементами
-function SceneBackground() {
-  return (
-    <>
-      {/* Небо */}
-      <Sky
-        distance={450000}
-        sunPosition={[0, 0.5, -1]}
-        inclination={0.49}
-        azimuth={0.25}
-        turbidity={10}
-        rayleigh={2}
-        mieCoefficient={0.005}
-        mieDirectionalG={0.8}
-      />
-
-      {/* Звезды для добавления атмосферы */}
-      <Stars
-        radius={100}
-        depth={50}
-        count={3000}
-        factor={4}
-        saturation={0}
-        fade
-        speed={1}
-      />
-
-      {/* Объемные облака */}
-      <StylizedCloud position={[-80, 10, -120]} scale={4} intensity={0.6} />
-      <StylizedCloud position={[90, 25, -170]} scale={6} intensity={0.5} />
-      <StylizedCloud position={[-40, 15, -140]} scale={5} intensity={0.55} />
-      <StylizedCloud position={[60, 18, -130]} scale={4.5} intensity={0.5} />
-      <StylizedCloud position={[0, 20, -160]} scale={5.5} intensity={0.45} />
-
-      {/* Облака внизу сцены */}
-      <StylizedCloud position={[0, -25, 0]} scale={8} intensity={0.25} />
-      <StylizedCloud position={[-30, -23, 20]} scale={7} intensity={0.2} />
-      <StylizedCloud position={[40, -22, -10]} scale={7.5} intensity={0.15} />
-      <StylizedCloud position={[20, -26, 30]} scale={8.5} intensity={0.18} />
-      <StylizedCloud position={[-50, -24, -15]} scale={9} intensity={0.2} />
-
-      {/* Стилизованный ландшафт */}
-      <StylizedLandscape />
-
-      {/* Добавим туманную дымку для глубины сцены */}
-      <fogExp2 attach="fog" color="#b9d5ff" density={0.008} />
-    </>
-  );
-}
-
-// Улучшенное освещение
-function EnhancedLighting() {
-  return (
-    <>
-      <ambientLight intensity={0.5} color="#e0e8ff" />
-      <directionalLight
-        position={[5, 15, 5]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
-        color="#fffaf0"
-      />
-      <pointLight
-        position={[-5, 5, -5]}
-        intensity={0.5}
-        color="#f0f0ff"
-        distance={20}
-      />
-      <pointLight
-        position={[5, 5, 5]}
-        intensity={0.3}
-        color="#ffe0c0"
-        distance={15}
-      />
-
-      {/* Светильники по углам доски для подсветки */}
-      <pointLight
-        position={[-4, 1, -4]}
-        intensity={0.4}
-        color="#ffe8d0"
-        distance={6}
-      />
-      <pointLight
-        position={[4, 1, 4]}
-        intensity={0.4}
-        color="#ffe8d0"
-        distance={6}
-      />
-      <pointLight
-        position={[-4, 1, 4]}
-        intensity={0.4}
-        color="#ffe8d0"
-        distance={6}
-      />
-      <pointLight
-        position={[4, 1, -4]}
-        intensity={0.4}
-        color="#ffe8d0"
-        distance={6}
-      />
-    </>
-  );
-}
-
-// Улучшенная функция для генерации процедурного шума
-function createNoise() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-
-  // Создаем градиентный шум
-  const imageData = ctx.createImageData(256, 256);
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const i = (y * 256 + x) * 4;
-      // Генерация более естественного шума
-      const value =
-        (Math.sin(x * 0.01) +
-          Math.sin(y * 0.01) +
-          Math.sin(x * 0.02 + y * 0.03) +
-          Math.sin(y * 0.02 + x * 0.01)) *
-          64 +
-        128;
-
-      imageData.data[i] = value;
-      imageData.data[i + 1] = value;
-      imageData.data[i + 2] = value;
-      imageData.data[i + 3] = 255;
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-  return new THREE.CanvasTexture(canvas);
-}
-
-// Улучшенные стилизованные облака с объемным эффектом
-function EnhancedStylizedCloud({ position, scale = 1, intensity = 1 }) {
-  const noiseTexture = useMemo(() => createNoise(), []);
-
-  return (
-    <group position={position} scale={scale}>
-      {/* Основная структура облака из нескольких перекрывающихся сфер */}
-      {[...Array(7)].map((_, i) => {
-        // Создаем псевдослучайные значения для каждого компонента облака
-        const posOffset = [
-          Math.sin(i * 3.14) * 1.5,
-          Math.cos(i * 2.7) * 0.8,
-          Math.sin(i * 1.5) * 0.7,
-        ];
-        const cloudSize = 1.2 + Math.sin(i * 2) * 0.7;
-        const opacity = 0.65 + Math.sin(i * 3) * 0.2;
-
-        return (
-          <mesh key={i} position={posOffset}>
-            <sphereGeometry args={[cloudSize, 24, 24]} />
-            <meshStandardMaterial
-              transparent
-              opacity={opacity * intensity}
-              color="#ffffff"
-              map={noiseTexture}
-              roughness={0.9}
-              metalness={0.1}
-              emissive="#ffffff"
-              emissiveIntensity={0.05}
-              depthWrite={false}
-            />
-          </mesh>
-        );
-      })}
-
-      {/* Добавление внутреннего свечения для глубины */}
-      <pointLight
-        position={[0, 0, 0]}
-        intensity={0.5 * intensity}
-        color="#ffffff"
-        distance={6}
-      />
-    </group>
-  );
-}
-
-// Процедурно-генерируемый ландшафт с более реалистичной геометрией
-function EnhancedLandscape() {
-  // Константы для настройки генерации ландшафта
+// Оптимизированная функция для создания ландшафта
+function OptimizedLandscape({ isMobile }) {
+  // Упрощенная геометрия для мобильных устройств
   const TERRAIN_SIZE = 1000;
-  const TERRAIN_SEGMENTS = 128;
+  const TERRAIN_SEGMENTS = isMobile ? 64 : 128;
   const MAX_HEIGHT = 60;
-
-  // Создаем процедурную геометрию ландшафта
-  const terrainGeometryRef = useRef();
 
   // Загружаем и настраиваем текстуры
   const terrainTextures = useTexture({
     map: "/textures/ground_color.jpg",
     normalMap: "/textures/ground_normal.jpg",
     roughnessMap: "/textures/ground_roughness.jpg",
-    displacementMap: "/textures/ground_height.jpg",
+    // Не загружаем displacement карту на мобильных
+    ...(isMobile ? {} : { displacementMap: "/textures/ground_height.jpg" }),
   });
 
-  // Важно: мемоизируем генерацию ландшафта, чтобы она происходила только один раз
+  // Мемоизированная геометрия
   const terrainGeometry = useMemo(() => {
     const geometry = new THREE.PlaneGeometry(
       TERRAIN_SIZE,
@@ -476,17 +150,18 @@ function EnhancedLandscape() {
 
     const vertices = geometry.attributes.position.array;
 
+    // Упрощенный алгоритм для мобильных
     for (let i = 0; i < vertices.length; i += 3) {
       const x = vertices[i];
       const z = vertices[i + 2];
 
-      // Используем разные частоты шума для создания более сложной поверхности
-      const elevation =
-        (Math.sin(x * 0.01) + Math.sin(z * 0.01)) * 10 +
-        (Math.sin(x * 0.05 + z * 0.03) + Math.sin(z * 0.05 + x * 0.03)) * 5 +
-        (Math.sin(x * 0.1 + z * 0.1) + Math.sin(z * 0.15 + x * 0.15)) * 2;
+      // Менее сложное вычисление высот для мобильных
+      const elevation = isMobile
+        ? (Math.sin(x * 0.01) + Math.sin(z * 0.01)) * 10
+        : (Math.sin(x * 0.01) + Math.sin(z * 0.01)) * 10 +
+          (Math.sin(x * 0.05 + z * 0.03) + Math.sin(z * 0.05 + x * 0.03)) * 5 +
+          (Math.sin(x * 0.1 + z * 0.1) + Math.sin(z * 0.15 + x * 0.15)) * 2;
 
-      // Добавляем высоту только если точка достаточно далеко от центра
       const distanceFromCenter = Math.sqrt(x * x + z * z);
       if (distanceFromCenter > 60) {
         vertices[i + 1] =
@@ -502,14 +177,15 @@ function EnhancedLandscape() {
     geometry.computeVertexNormals();
 
     return geometry;
-  }, []); // Пустой массив зависимостей - вычисляется только один раз
+  }, [isMobile]);
 
   useEffect(() => {
     Object.values(terrainTextures).forEach((texture) => {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(40, 40);
+      // Меньше повторений текстур на мобильных для производительности
+      texture.repeat.set(isMobile ? 20 : 40, isMobile ? 20 : 40);
     });
-  }, [terrainTextures]);
+  }, [terrainTextures, isMobile]);
 
   return (
     <group position={[0, -40, 0]}>
@@ -518,20 +194,22 @@ function EnhancedLandscape() {
         <primitive object={terrainGeometry} attach="geometry" />
         <meshStandardMaterial
           {...terrainTextures}
-          displacementScale={15}
+          displacementScale={isMobile ? 5 : 15}
           color="#3a5e30"
           roughness={1}
           metalness={0.1}
         />
       </mesh>
 
-      {/* Горы вдали - используем useMemo для остальных элементов ландшафта */}
+      {/* Горы вдали - уменьшаем количество для мобильных */}
       {useMemo(
         () => (
           <group>
-            {/* Первая гряда гор */}
+            {/* Только основные горы для мобильных */}
             <mesh position={[30, 15, -120]} rotation={[-0.1, 0.3, 0]}>
-              <coneGeometry args={[60, 70, 6, 2]} />
+              <coneGeometry
+                args={[60, 70, isMobile ? 4 : 6, isMobile ? 1 : 2]}
+              />
               <meshStandardMaterial
                 color="#2d4c2a"
                 roughness={0.9}
@@ -539,9 +217,10 @@ function EnhancedLandscape() {
               />
             </mesh>
 
-            {/* Вторая гряда гор */}
             <mesh position={[-90, 20, -150]} rotation={[-0.05, -0.2, 0.1]}>
-              <coneGeometry args={[80, 90, 5, 2]} />
+              <coneGeometry
+                args={[80, 90, isMobile ? 4 : 5, isMobile ? 1 : 2]}
+              />
               <meshStandardMaterial
                 color="#27442b"
                 roughness={0.9}
@@ -549,46 +228,39 @@ function EnhancedLandscape() {
               />
             </mesh>
 
-            {/* Дополнительные горы для заполнения горизонта */}
-            <mesh position={[-40, 18, -180]} rotation={[0, 0.5, 0.1]}>
-              <coneGeometry args={[50, 60, 7, 2]} />
-              <meshStandardMaterial
-                color="#2a453b"
-                roughness={0.9}
-                metalness={0.1}
-              />
-            </mesh>
+            {/* Дополнительные горы только для десктопа */}
+            {!isMobile && (
+              <>
+                <mesh position={[-40, 18, -180]} rotation={[0, 0.5, 0.1]}>
+                  <coneGeometry args={[50, 60, 7, 2]} />
+                  <meshStandardMaterial
+                    color="#2a453b"
+                    roughness={0.9}
+                    metalness={0.1}
+                  />
+                </mesh>
 
-            <mesh position={[80, 25, -200]} rotation={[0, -0.3, 0.05]}>
-              <coneGeometry args={[70, 80, 5, 2]} />
-              <meshStandardMaterial
-                color="#253c28"
-                roughness={0.9}
-                metalness={0.1}
-              />
-            </mesh>
+                <mesh position={[80, 25, -200]} rotation={[0, -0.3, 0.05]}>
+                  <coneGeometry args={[70, 80, 5, 2]} />
+                  <meshStandardMaterial
+                    color="#253c28"
+                    roughness={0.9}
+                    metalness={0.1}
+                  />
+                </mesh>
+              </>
+            )}
           </group>
         ),
-        []
+        [isMobile]
       )}
 
-      {/* Озеро */}
-      <mesh position={[120, -32, 120]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[80, 32]} />
-        <meshStandardMaterial
-          color="#1e5484"
-          roughness={0.1}
-          metalness={0.6}
-          envMapIntensity={1.5}
-        />
-      </mesh>
-
-      {/* Лесистые холмы вокруг игрового пространства - генерируем с помощью useMemo */}
+      {/* Лесистые холмы - уменьшаем количество для мобильных */}
       {useMemo(
         () => (
           <>
-            {[...Array(12)].map((_, i) => {
-              const angle = (i / 12) * Math.PI * 2;
+            {[...Array(isMobile ? 6 : 12)].map((_, i) => {
+              const angle = (i / (isMobile ? 6 : 12)) * Math.PI * 2;
               const radius = 60 + Math.random() * 40;
               const x = Math.cos(angle) * radius;
               const z = Math.sin(angle) * radius;
@@ -599,7 +271,15 @@ function EnhancedLandscape() {
                   {/* Холм */}
                   <mesh position={[0, 0, 0]}>
                     <sphereGeometry
-                      args={[scale, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]}
+                      args={[
+                        scale,
+                        isMobile ? 8 : 16,
+                        isMobile ? 8 : 16,
+                        0,
+                        Math.PI * 2,
+                        0,
+                        Math.PI / 2,
+                      ]}
                     />
                     <meshStandardMaterial
                       color="#2a4d25"
@@ -608,56 +288,62 @@ function EnhancedLandscape() {
                     />
                   </mesh>
 
-                  {/* Деревья на холме */}
-                  {[...Array(Math.floor(3 + Math.random() * 5))].map((_, j) => {
-                    const treeX = (Math.random() - 0.5) * scale * 0.8;
-                    const treeZ = (Math.random() - 0.5) * scale * 0.8;
-                    const treeHeight = 5 + Math.random() * 8;
+                  {/* Деревья на холмах - только для десктопа */}
+                  {!isMobile &&
+                    [...Array(Math.floor(3 + Math.random() * 5))].map(
+                      (_, j) => {
+                        const treeX = (Math.random() - 0.5) * scale * 0.8;
+                        const treeZ = (Math.random() - 0.5) * scale * 0.8;
+                        const treeHeight = 5 + Math.random() * 8;
 
-                    return (
-                      <group key={j} position={[treeX, scale * 0.5, treeZ]}>
-                        {/* Ствол */}
-                        <mesh position={[0, 0, 0]}>
-                          <cylinderGeometry args={[0.5, 0.8, treeHeight, 6]} />
-                          <meshStandardMaterial
-                            color="#5c4033"
-                            roughness={0.9}
-                          />
-                        </mesh>
-
-                        {/* Крона */}
-                        <mesh position={[0, treeHeight * 0.6, 0]}>
-                          <coneGeometry
-                            args={[treeHeight * 0.5, treeHeight, 8]}
-                          />
-                          <meshStandardMaterial
-                            color="#1e3d14"
-                            roughness={0.9}
-                          />
-                        </mesh>
-                      </group>
-                    );
-                  })}
+                        return (
+                          <group key={j} position={[treeX, scale * 0.5, treeZ]}>
+                            <mesh position={[0, 0, 0]}>
+                              <cylinderGeometry
+                                args={[0.5, 0.8, treeHeight, 6]}
+                              />
+                              <meshStandardMaterial
+                                color="#5c4033"
+                                roughness={0.9}
+                              />
+                            </mesh>
+                            <mesh position={[0, treeHeight * 0.6, 0]}>
+                              <coneGeometry
+                                args={[treeHeight * 0.5, treeHeight, 8]}
+                              />
+                              <meshStandardMaterial
+                                color="#1e3d14"
+                                roughness={0.9}
+                              />
+                            </mesh>
+                          </group>
+                        );
+                      }
+                    )}
                 </group>
               );
             })}
           </>
         ),
-        []
+        [isMobile]
       )}
     </group>
   );
 }
 
-// Обновленный компонент фона сцены
-function EnhancedSceneBackground() {
-  // Мемоизируем распределение облаков для предотвращения изменений при перерисовке
+// Оптимизированный компонент фона сцены
+function OptimizedSceneBackground() {
+  const isMobile = useIsMobile();
+
+  // Уменьшаем количество облаков для мобильных
   const cloudPositions = useMemo(() => {
     const positions = [];
+    const skyCloudCount = isMobile ? 7 : 15;
+    const bottomCloudCount = isMobile ? 4 : 8;
 
     // Облака в небе
-    for (let i = 0; i < 15; i++) {
-      const angle = (i / 15) * Math.PI * 2;
+    for (let i = 0; i < skyCloudCount; i++) {
+      const angle = (i / skyCloudCount) * Math.PI * 2;
       const radius = 100 + Math.random() * 100;
       positions.push({
         x: Math.cos(angle) * radius,
@@ -670,8 +356,8 @@ function EnhancedSceneBackground() {
     }
 
     // Облака внизу
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2;
+    for (let i = 0; i < bottomCloudCount; i++) {
+      const angle = (i / bottomCloudCount) * Math.PI * 2;
       const radius = 40 + Math.random() * 30;
       positions.push({
         x: Math.cos(angle) * radius,
@@ -684,11 +370,11 @@ function EnhancedSceneBackground() {
     }
 
     return positions;
-  }, []);
+  }, [isMobile]);
 
   return (
     <>
-      {/* Небо с улучшенными параметрами */}
+      {/* Небо с упрощенными параметрами для мобильных */}
       <Sky
         distance={450000}
         sunPosition={[0, 0.6, -1]}
@@ -700,38 +386,100 @@ function EnhancedSceneBackground() {
         mieDirectionalG={0.85}
       />
 
-      {/* Звезды для добавления атмосферы */}
+      {/* Звезды - меньше для мобильных */}
       <Stars
         radius={120}
         depth={60}
-        count={4000}
+        count={isMobile ? 2000 : 4000}
         factor={5}
         saturation={0.2}
         fade
         speed={0.5}
       />
 
-      {/* Улучшенные объемные облака с более реалистичным распределением */}
+      {/* Оптимизированные облака */}
       {cloudPositions.map((cloud) => (
-        <EnhancedStylizedCloud
+        <OptimizedCloud
           key={cloud.id}
           position={[cloud.x, cloud.y, cloud.z]}
           scale={cloud.scale}
           intensity={cloud.intensity}
+          isMobile={isMobile}
         />
       ))}
 
-      {/* Улучшенный ландшафт */}
-      <EnhancedLandscape />
+      {/* Оптимизированный ландшафт */}
+      <OptimizedLandscape isMobile={isMobile} />
 
-      {/* Улучшенный туман для глубины сцены */}
-      <fogExp2 attach="fog" color="#b9d5ff" density={0.006} />
+      {/* Улучшенный туман */}
+      <fogExp2
+        attach="fog"
+        color="#b9d5ff"
+        density={isMobile ? 0.008 : 0.006}
+      />
+    </>
+  );
+}
+
+// Оптимизированное освещение
+function OptimizedLighting() {
+  const isMobile = useIsMobile();
+
+  return (
+    <>
+      <ambientLight intensity={0.5} color="#e0e8ff" />
+      <directionalLight
+        position={[5, 15, 5]}
+        intensity={1.2}
+        castShadow={!isMobile}
+        shadow-mapSize-width={isMobile ? 512 : 1024}
+        shadow-mapSize-height={isMobile ? 512 : 1024}
+        shadow-camera-far={50}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+        color="#fffaf0"
+      />
+
+      {/* Дополнительное освещение только для десктопа */}
+      {!isMobile && (
+        <>
+          <pointLight
+            position={[-5, 5, -5]}
+            intensity={0.5}
+            color="#f0f0ff"
+            distance={20}
+          />
+          <pointLight
+            position={[5, 5, 5]}
+            intensity={0.3}
+            color="#ffe0c0"
+            distance={15}
+          />
+        </>
+      )}
+
+      {/* Основные светильники по углам доски */}
+      <pointLight
+        position={[-4, 1, -4]}
+        intensity={0.4}
+        color="#ffe8d0"
+        distance={6}
+      />
+      <pointLight
+        position={[4, 1, 4]}
+        intensity={0.4}
+        color="#ffe8d0"
+        distance={6}
+      />
     </>
   );
 }
 
 export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
   const [hoveredSquare, setHoveredSquare] = useState(null);
+  const isMobile = useIsMobile();
 
   // Рендеринг клеток доски с чётким шахматным узором
   const renderBoardSquares = () => {
@@ -798,7 +546,7 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
             key={`square-${row}-${col}`}
             position={[row - 3.5, -0.097, col - 3.5]}
             rotation={[-Math.PI / 2, 0, 0]}
-            receiveShadow
+            receiveShadow={!isMobile}
             onClick={(e) => {
               e.stopPropagation();
               if (isValidMove || board[row][col] !== EMPTY) {
@@ -818,31 +566,99 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           </mesh>
         );
 
-        // Добавляем тонкую рамку вокруг клетки для улучшения шашечного вида
-        squares.push(
-          <mesh
-            key={`border-${row}-${col}`}
-            position={[row - 3.5, -0.096, col - 3.5]}
-            rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial
-              color={isEven ? "#774936" : "#E8D0AA"}
-              opacity={0.2}
-              transparent
-            />
-          </mesh>
-        );
+        // Добавляем рамку только для настольных устройств
+        if (!isMobile) {
+          squares.push(
+            <mesh
+              key={`border-${row}-${col}`}
+              position={[row - 3.5, -0.096, col - 3.5]}
+              rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[1, 1]} />
+              <meshBasicMaterial
+                color={isEven ? "#774936" : "#E8D0AA"}
+                opacity={0.2}
+                transparent
+              />
+            </mesh>
+          );
+        }
       }
     }
 
     return squares;
   };
 
-  // рендеринг сцены
+  // Компонент доски
+  function Board({ renderBoardSquares }) {
+    // Загружаем текстуры дерева
+    const woodTextures = useTexture({
+      map: "/textures/wood_color.png",
+      // На мобильных устройствах не используем сложные текстуры
+      ...(isMobile
+        ? {}
+        : {
+            normalMap: "/textures/wood_normal.png",
+            roughnessMap: "/textures/wood_roughness.jpg",
+          }),
+    });
+
+    // Настраиваем текстуру для повторения
+    React.useEffect(() => {
+      Object.values(woodTextures).forEach((texture) => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(4, 4);
+      });
+    }, [woodTextures]);
+
+    // Создаём материал с текстурой дерева
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      ...woodTextures,
+      roughness: 0.8,
+      metalness: 0.1,
+      color: "#8B5A2B",
+    });
+
+    return (
+      <group>
+        <mesh
+          position={[0, -0.1, 4.25]}
+          receiveShadow={!isMobile}
+          castShadow={!isMobile}>
+          <boxGeometry args={[9, 0.3, 0.5]} />
+          <primitive object={woodMaterial} attach="material" />
+        </mesh>
+        <mesh
+          position={[0, -0.1, -4.25]}
+          receiveShadow={!isMobile}
+          castShadow={!isMobile}>
+          <boxGeometry args={[9, 0.3, 0.5]} />
+          <primitive object={woodMaterial} attach="material" />
+        </mesh>
+        <mesh
+          position={[4.25, -0.1, 0]}
+          receiveShadow={!isMobile}
+          castShadow={!isMobile}>
+          <boxGeometry args={[0.5, 0.3, 9]} />
+          <primitive object={woodMaterial} attach="material" />
+        </mesh>
+        <mesh
+          position={[-4.25, -0.1, 0]}
+          receiveShadow={!isMobile}
+          castShadow={!isMobile}>
+          <boxGeometry args={[0.5, 0.3, 9]} />
+          <primitive object={woodMaterial} attach="material" />
+        </mesh>
+
+        {renderBoardSquares()}
+      </group>
+    );
+  }
+
+  // Рендеринг сцены
   return (
     <Canvas
-      shadows
-      dpr={window.devicePixelRatio}
+      shadows={!isMobile}
+      dpr={isMobile ? [1, 1.5] : window.devicePixelRatio}
       style={{
         width: "100vw",
         height: "100vh",
@@ -852,7 +668,7 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
         outline: "none",
       }}
       gl={{
-        antialias: true,
+        antialias: !isMobile,
         powerPreference: "high-performance",
         alpha: false,
       }}>
@@ -863,28 +679,31 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
         minPolarAngle={Math.PI / 6}
         maxDistance={12}
         minDistance={5}
+        enableDamping={!isMobile} // Отключаем демпфирование на мобильных для производительности
       />
 
-      <Renderer />
+      <AdaptiveRenderer />
 
-      <EnhancedLighting />
+      <OptimizedLighting />
 
-      {/* Заменяем SceneBackground на EnhancedSceneBackground */}
-      <EnhancedSceneBackground />
+      {/* Используем оптимизированный фон сцены */}
+      <OptimizedSceneBackground />
 
       <Suspense fallback={null}>
         <Board renderBoardSquares={renderBoardSquares} />
 
-        {/* тени */}
-        <ContactShadows
-          position={[0, -0.5, 0]}
-          opacity={0.4}
-          width={15}
-          height={15}
-          blur={1.5}
-          far={4.5}
-          resolution={256}
-        />
+        {/* Тени только для настольных устройств */}
+        {!isMobile && (
+          <ContactShadows
+            position={[0, -0.5, 0]}
+            opacity={0.4}
+            width={15}
+            height={15}
+            blur={1.5}
+            far={4.5}
+            resolution={256}
+          />
+        )}
 
         {/* Фигуры */}
         {board.map((row, rowIndex) =>
@@ -907,6 +726,7 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
                   selectedPiece.row === rowIndex &&
                   selectedPiece.col === colIndex
                 }
+                isMobile={isMobile}
               />
             );
           })
@@ -917,6 +737,3 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
     </Canvas>
   );
 }
-
-// Нужно добавить useMemo, который мы используем в облаках
-import { useMemo, useRef, useEffect } from "react";

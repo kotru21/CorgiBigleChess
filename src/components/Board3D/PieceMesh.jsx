@@ -27,11 +27,65 @@ const crownMaterial = new THREE.MeshStandardMaterial({
 
 // Кеш моделей для предотвращения многократной загрузки
 const modelCache = {};
+const lowPolyCache = {}; // Кеш для низкополигональных моделей
 
-export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
+export function PieceMesh({
+  type,
+  position,
+  isKing,
+  onClick,
+  isSelected,
+  isMobile = false,
+}) {
   const groupRef = useRef();
   const [hovered, setHovered] = useState(false);
   const { currentHeight } = usePieceAnimations(isSelected);
+
+  // Функция для создания упрощенной версии модели
+  const getSimplifiedModel = (type) => {
+    if (!lowPolyCache[type]) {
+      // Это будут простые геометрические формы вместо сложных 3D-моделей
+      const group = new THREE.Group();
+
+      if (type === "beagle") {
+        // Простой бигль - цилиндр и сфера
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.4, 0.3, 0.7, 8),
+          beagleMaterial
+        );
+        body.position.y = 0.35;
+
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 8, 8),
+          beagleMaterial
+        );
+        head.position.set(0, 0.8, 0.1);
+
+        group.add(body);
+        group.add(head);
+      } else {
+        // Простой корги - прямоугольный параллелепипед и сфера
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(0.8, 0.4, 0.5),
+          corgiMaterial
+        );
+        body.position.y = 0.2;
+
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.25, 8, 8),
+          corgiMaterial
+        );
+        head.position.set(0, 0.5, 0.1);
+
+        group.add(body);
+        group.add(head);
+      }
+
+      lowPolyCache[type] = group;
+    }
+
+    return lowPolyCache[type];
+  };
 
   // Загрузка моделей с использованием кеша
   if (!modelCache[type]) {
@@ -117,7 +171,7 @@ export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
 
       {/* Модель фигуры с поворотом для биглей */}
       <primitive
-        object={modelCache[type].clone()}
+        object={isMobile ? getSimplifiedModel(type) : modelCache[type].clone()}
         position={[0, -0.1, 0]}
         rotation={modelRotation} // Применяем поворот
         scale={3}
