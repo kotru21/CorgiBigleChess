@@ -2,10 +2,15 @@ import React, { useEffect, useState } from "react";
 import { Board3D } from "./Board3D";
 import { useGame } from "../contexts/GameContext.jsx";
 import { getValidMoves, executeMove } from "../services/MoveService";
-import { movePiece, checkGameStatus } from "../services/BoardService";
+import {
+  movePiece,
+  checkGameStatus,
+  createInitialBoard,
+} from "../services/BoardService";
 import { PLAYER, BOT, PLAYER_KING, BOT_KING } from "../models/Constants";
+import { useBotAI } from "../hooks/useBotAI"; // Добавляем импорт хука для бота
 
-export function GameBoard({ isFullscreen, onExitFullscreen }) {
+export function GameBoard({ onReturnToMenu }) {
   const {
     board,
     setBoard,
@@ -20,6 +25,9 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
     gameMessage,
     setGameMessage,
   } = useGame();
+
+  // Подключаем AI бота
+  const { makeBotMove } = useBotAI();
 
   // Выбор фигуры или ход
   const handlePieceSelect = (row, col) => {
@@ -122,47 +130,28 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
   return (
     <div
       id="chess-board-container"
-      className={`
-        flex items-center justify-center
-        ${
-          isFullscreen
-            ? "fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 w-screen h-screen z-50"
-            : "w-full"
-        }
-        transition-all duration-300
-      `}>
-      {/* Полноэкранный режим - кнопка выхода */}
-      {isFullscreen && (
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={onExitFullscreen}
-            className="px-4 py-2 bg-gray-800/80 text-white rounded-lg shadow-lg
-                     hover:bg-gray-700/80 transition-colors">
-            Выйти из полноэкранного режима
-          </button>
+      className="fixed inset-0 w-screen h-screen overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* Статус игры */}
+      <div className="absolute top-2 left-2 z-10 px-3 py-1 bg-black/40 backdrop-blur-sm rounded-md text-white font-medium">
+        {gameMessage}
+      </div>
+
+      {/* Кнопка возврата в меню - теперь использует переданную функцию */}
+      <button
+        onClick={onReturnToMenu}
+        className="absolute top-2 right-2 z-10 px-3 py-1 bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-md text-white transition-colors">
+        Меню
+      </button>
+
+      {/* Игровая подсказка */}
+      {playerTurn && !gameOver && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 px-4 py-2 bg-black/40 backdrop-blur-sm rounded-md text-white text-sm">
+          {selectedPiece ? "Выберите поле для хода" : "Выберите бигля для хода"}
         </div>
       )}
 
-      {/* Полноэкранный режим - сообщение */}
-      {isFullscreen && (
-        <div className="absolute top-4 left-4 z-10">
-          <div className="px-4 py-2 bg-gray-800/80 text-white rounded-lg shadow-lg">
-            {gameMessage}
-          </div>
-        </div>
-      )}
-
-      {/* Доска */}
-      <div
-        className={`
-          ${
-            isFullscreen
-              ? "w-[min(90vh,90vw)] h-[min(90vh,90vw)]"
-              : "w-full max-w-[600px] aspect-square"
-          }
-          shadow-2xl
-          transition-all duration-300
-        `}>
+      {/* Доска на весь экран */}
+      <div className="w-full h-full">
         <Board3D
           board={board}
           onPieceSelect={handlePieceSelect}
@@ -170,6 +159,38 @@ export function GameBoard({ isFullscreen, onExitFullscreen }) {
           validMoves={validMoves}
         />
       </div>
+
+      {/* Показ статуса окончания игры */}
+      {gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-20">
+          <div className="bg-white/10 backdrop-blur-md p-6 rounded-xl shadow-2xl text-center max-w-md mx-4">
+            <h2 className="text-2xl font-bold mb-4 text-white">
+              {gameMessage}
+            </h2>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  // Сброс игры и начало новой
+                  const newBoard = createInitialBoard();
+                  setBoard(newBoard);
+                  setGameOver(false);
+                  setPlayerTurn(true);
+                  setGameMessage("Новая игра! Ваш ход!");
+                  setSelectedPiece(null);
+                  setValidMoves([]);
+                }}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg shadow-lg hover:from-purple-600 hover:to-blue-600 transition-colors">
+                Новая игра
+              </button>
+              <button
+                onClick={onReturnToMenu}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-700 text-white rounded-lg shadow-lg hover:from-gray-600 hover:to-gray-800 transition-colors">
+                В меню
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
