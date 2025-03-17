@@ -1,16 +1,115 @@
-import { Suspense, useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { Suspense, useState, useRef } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import {
+  OrbitControls,
+  PerspectiveCamera,
+  Environment,
+  ContactShadows,
+  useTexture,
+} from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
 import React from "react";
 import { EMPTY } from "../../models/Constants";
+import * as THREE from "three";
+
+//компонент доски
+function Board({ renderBoardSquares }) {
+  // Загружаем текстуры дерева из локальных файлов
+  const woodTextures = useTexture({
+    map: "/textures/wood_color.png",
+    normalMap: "/textures/wood_normal.png",
+    roughnessMap: "/textures/wood_roughness.jpg",
+  });
+
+  // Настраиваем текстуру для повторения
+  React.useEffect(() => {
+    Object.values(woodTextures).forEach((texture) => {
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+    });
+  }, [woodTextures]);
+
+  // Создаём материал с текстурой дерева
+  const woodMaterial = new THREE.MeshStandardMaterial({
+    ...woodTextures,
+    roughness: 0.8,
+    metalness: 0.1,
+    color: "#8B5A2B",
+  });
+
+  return (
+    <group>
+      <mesh position={[0, -0.1, 4.25]} receiveShadow castShadow>
+        <boxGeometry args={[9, 0.3, 0.5]} />
+        <primitive object={woodMaterial} attach="material" />
+      </mesh>
+      <mesh position={[0, -0.1, -4.25]} receiveShadow castShadow>
+        <boxGeometry args={[9, 0.3, 0.5]} />
+        <primitive object={woodMaterial} attach="material" />
+      </mesh>
+      <mesh position={[4.25, -0.1, 0]} receiveShadow castShadow>
+        <boxGeometry args={[0.5, 0.3, 9]} />
+        <primitive object={woodMaterial} attach="material" />
+      </mesh>
+      <mesh position={[-4.25, -0.1, 0]} receiveShadow castShadow>
+        <boxGeometry args={[0.5, 0.3, 9]} />
+        <primitive object={woodMaterial} attach="material" />
+      </mesh>
+
+      {renderBoardSquares()}
+    </group>
+  );
+}
+
+function Renderer() {
+  const { gl } = useThree();
+
+  React.useEffect(() => {
+    //настройки рендеринга
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.outputEncoding = THREE.sRGBEncoding;
+  }, [gl]);
+
+  return null;
+}
+
+// Упрощенное окружение
+function SimpleEnvironment() {
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight
+        position={[5, 10, 5]}
+        intensity={1.0}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-far={15}
+      />
+      <pointLight position={[-5, 5, -5]} intensity={0.5} color="#f0f0ff" />
+    </>
+  );
+}
 
 export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
   const [hoveredSquare, setHoveredSquare] = useState(null);
 
-  // Рендер клеток доски
+  // Рендеринг клеток доски с чётким шахматным узором
   const renderBoardSquares = () => {
     const squares = [];
+
+    // Загружаем текстуры для клеток
+    const darkSquareTexture = useTexture("/textures/dark_square.jpg");
+    const lightSquareTexture = useTexture("/textures/light_square.jpg");
+
+    // Настройка текстур
+    React.useEffect(() => {
+      [darkSquareTexture, lightSquareTexture].forEach((texture) => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1);
+      });
+    }, [darkSquareTexture, lightSquareTexture]);
 
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
@@ -27,24 +126,38 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           hoveredSquare.row === row &&
           hoveredSquare.col === col;
 
-        // Определяем цвет клетки
-        let color = isEven ? "#553311" : "#8B4513";
-        if (isSelected) color = "#66BB66";
-        else if (isValidMove) color = "#6699FF";
-        else if (isHovered && !isEven) color = "#AA6633";
+        // Создаём материалы с текстурами
+        const material = new THREE.MeshStandardMaterial({
+          map: isEven ? lightSquareTexture : darkSquareTexture,
+          color: isEven ? "#E8D0AA" : "#774936",
+          roughness: 0.7,
+          metalness: 0.05,
+        });
+
+        // Модификация материала для особых состояний
+        if (isSelected) {
+          material.color.set("#66BB66");
+        } else if (isValidMove) {
+          material.color.set("#6699FF");
+          material.transparent = true;
+          material.opacity = 0.9;
+        } else if (isHovered) {
+          if (isEven) {
+            material.color.set("#F0DDB8");
+          } else {
+            material.color.set("#8A5A44");
+          }
+        }
 
         squares.push(
           <mesh
-            key={`${row}-${col}`}
-            position={[row - 3.5, -0.099, col - 3.5]}
+            key={`square-${row}-${col}`}
+            position={[row - 3.5, -0.097, col - 3.5]}
             rotation={[-Math.PI / 2, 0, 0]}
             receiveShadow
             onClick={(e) => {
-              // Четкое блокирование всплытия события
               e.stopPropagation();
-
-              // Вызываем onPieceSelect только если это допустимый ход
-              if (isValidMove) {
+              if (isValidMove || board[row][col] !== EMPTY) {
                 onPieceSelect(row, col);
               }
             }}
@@ -56,13 +169,21 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
               e.stopPropagation();
               setHoveredSquare(null);
             }}>
-            <planeGeometry args={[1, 1]} />
-            <meshStandardMaterial
-              color={color}
-              metalness={0.1}
-              roughness={0.8}
-              transparent={isValidMove}
-              opacity={isValidMove ? 0.8 : 1}
+            <planeGeometry args={[0.95, 0.95]} />
+            <primitive object={material} attach="material" />
+          </mesh>
+        );
+
+        // Добавляем тонкую рамку вокруг клетки для улучшения шашечного вида
+        squares.push(
+          <mesh
+            key={`border-${row}-${col}`}
+            position={[row - 3.5, -0.096, col - 3.5]}
+            rotation={[-Math.PI / 2, 0, 0]}>
+            <meshBasicMaterial
+              color={isEven ? "#774936" : "#E8D0AA"}
+              opacity={0.3}
+              transparent
             />
           </mesh>
         );
@@ -72,41 +193,44 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
     return squares;
   };
 
+  // рендеринг сцены
   return (
-    <Canvas shadows camera={{ position: [0, 5, 5], fov: 50 }}>
-      <PerspectiveCamera makeDefault position={[0, 5, 5]} />
+    <Canvas
+      shadows
+      dpr={[1, 1.5]} // ограничиваем максимальный DPR для производительности
+      performance={{ min: 0.5 }} // разрешаем Three.js понижать качество при низкой производительности
+      gl={{
+        antialias: true,
+        powerPreference: "high-performance",
+        alpha: false, // повышает производительность
+      }}>
+      <PerspectiveCamera makeDefault position={[0, 5, 7]} fov={50} />
       <OrbitControls
         enableZoom={true}
-        maxPolarAngle={Math.PI / 2.5}
-        minPolarAngle={Math.PI / 4}
+        maxPolarAngle={Math.PI / 2.2}
+        minPolarAngle={Math.PI / 6}
+        maxDistance={12}
+        minDistance={5}
       />
 
-      {/* Освещение */}
-      <ambientLight intensity={0.5} />
-      <directionalLight
-        position={[5, 5, 5]}
-        intensity={1}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
-      <directionalLight position={[-5, 5, -5]} intensity={0.5} />
+      <Renderer />
+      <SimpleEnvironment />
 
-      {/* Основа доски */}
-      <group>
-        <mesh position={[0, -0.2, 0]} receiveShadow>
-          <boxGeometry args={[8.2, 0.2, 8.2]} />
-          <meshStandardMaterial
-            color="#4A3728"
-            metalness={0.2}
-            roughness={0.8}
-          />
-        </mesh>
-        {renderBoardSquares()}
-      </group>
-
-      {/* Фигуры */}
       <Suspense fallback={null}>
+        <Board renderBoardSquares={renderBoardSquares} />
+
+        {/* тени */}
+        <ContactShadows
+          position={[0, -0.5, 0]}
+          opacity={0.4}
+          width={15}
+          height={15}
+          blur={1.5}
+          far={4.5}
+          resolution={256}
+        />
+
+        {/* Фигуры */}
         {board.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             if (cell === EMPTY) return null;
@@ -132,6 +256,8 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
           })
         )}
       </Suspense>
+
+      <Environment preset="sunset" intensity={0.2} />
     </Canvas>
   );
 }

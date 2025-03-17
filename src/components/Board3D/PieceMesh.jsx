@@ -4,105 +4,149 @@ import { useFrame } from "@react-three/fiber";
 import React from "react";
 import { usePieceAnimations } from "../../hooks/usePieceAnimations";
 import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
+
+// Кешируем материалы для повторного использования
+const beagleMaterial = new THREE.MeshStandardMaterial({
+  color: "#FFD700",
+  roughness: 0.4,
+  metalness: 0.3,
+});
+
+const corgiMaterial = new THREE.MeshStandardMaterial({
+  color: "#FF8C00",
+  roughness: 0.4,
+  metalness: 0.3,
+});
+
+const crownMaterial = new THREE.MeshStandardMaterial({
+  color: "#FFD700",
+  roughness: 0.2,
+  metalness: 0.8,
+});
+
+// Кеш моделей для предотвращения многократной загрузки
+const modelCache = {};
 
 export function PieceMesh({ type, position, isKing, onClick, isSelected }) {
   const groupRef = useRef();
   const [hovered, setHovered] = useState(false);
-  const { animateHeight, currentHeight } = usePieceAnimations(isSelected);
+  const { currentHeight } = usePieceAnimations(isSelected);
 
-  const { scene: modelScene } = useGLTF(`/models/${type}.glb`);
-  const { scene: crownScene } = useGLTF("/models/crown.glb");
+  // Загрузка моделей с использованием кеша
+  if (!modelCache[type]) {
+    const { scene } = useGLTF(`/models/${type}.glb`);
+    modelCache[type] = scene;
 
-  // Анимация при наведении и выборе
-  useFrame(() => {
+    // Оптимизация материалов для всей модели
+    scene.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.material = type === "beagle" ? beagleMaterial : corgiMaterial;
+      }
+    });
+  }
+
+  if (!modelCache["crown"]) {
+    const { scene } = useGLTF("/models/crown.glb");
+    modelCache["crown"] = scene;
+
+    // Оптимизация материалов короны
+    scene.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.material = crownMaterial;
+      }
+    });
+  }
+
+  // Оптимизированная анимация
+  useFrame((_, delta) => {
     if (groupRef.current) {
       groupRef.current.position.y = currentHeight;
 
-      if (hovered || isSelected) {
-        groupRef.current.rotation.y += 0.02;
+      // Анимация вращения только для выбранных биглей
+      if ((hovered || isSelected) && type === "beagle") {
+        groupRef.current.rotation.y += delta * (isSelected ? 1.0 : 0.5);
       }
     }
   });
 
-  // Глубина теней зависит от статуса фигуры
-  const shadowOpacity = isSelected ? 0.4 : hovered ? 0.3 : 0.2;
-
   // Масштаб для разных типов собак
-  const scale = type === "corgi" ? 0.4 : 0.35;
+  const scale = type === "corgi" ? 0.4 : 0.43;
 
-  // Создаем отдельный обработчик клика, который будет использоваться только на hitbox
-  const handleClickEvent = (e) => {
+  // Обработчик клика - игнорируем клики на корги
+  const handleClick = (e) => {
+    // Прерываем обработку события, чтобы оно не распространялось
     e.stopPropagation();
-    onClick();
+
+    // Активируем обработку клика только для биглей
+    if (type === "beagle") {
+      onClick();
+    }
   };
+
+  // Вычисляем поворот для модели
+  const modelRotation = type === "beagle" ? [0, 11, 0] : [0, 0, 0];
 
   return (
     <group
       position={[position[0], position[1], position[2]]}
       ref={groupRef}
-      scale={hovered || isSelected ? scale * 1.1 : scale}>
-      {/*  hitbox */}
+      scale={hovered && type === "beagle" ? scale * 1.1 : scale}>
+      {/* Хитбокс для кликов - обрабатывает только клики на биглей */}
       <mesh
-        onClick={handleClickEvent}
+        onClick={handleClick}
         onPointerOver={(e) => {
           e.stopPropagation();
-          setHovered(true);
+          // Наведение активно только для биглей
+          if (type === "beagle") {
+            setHovered(true);
+          }
         }}
         onPointerOut={(e) => {
           e.stopPropagation();
           setHovered(false);
         }}
-        visible={false} // невидимый, но обнаруживаемый для кликов
-        position={[0, 0.5, 0]}>
+        visible={false}>
         <boxGeometry args={[0.8, 1, 0.8]} />
-        <meshBasicMaterial transparent opacity={0.0} />
+        <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
-      {/* Тень под фигурой */}
-      <mesh
-        position={[0, -0.08, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        receiveShadow>
-        <circleGeometry args={[0.4, 32]} />
-        <meshBasicMaterial
-          color="black"
-          transparent={true}
-          opacity={shadowOpacity}
-        />
-      </mesh>
-
-      {/* Модель собаки - визуальная часть, не реагирующая на события */}
+      {/* Модель фигуры с поворотом для биглей */}
       <primitive
-        scale={3}
-        object={modelScene.clone()}
+        object={modelCache[type].clone()}
         position={[0, -0.1, 0]}
-        castShadow
-        receiveShadow
+        rotation={modelRotation} // Применяем поворот
+        scale={3}
       />
 
       {/* Корона для королей */}
       {isKing && (
         <primitive
-          object={crownScene.clone()}
-          rotation={[-Math.PI / 2, 0, 0]}
+          object={modelCache["crown"].clone()}
           position={[0, 2, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
           scale={0.03}
-          castShadow
         />
       )}
 
-      {/* Подсветка при наведении */}
-      <pointLight
-        position={[0, 0.5, 0]}
-        intensity={hovered ? 0.5 : isSelected ? 0.7 : 0}
-        color={type === "corgi" ? "#FFA500" : "#FFD700"}
-        distance={1.2}
-      />
+      {/* Свечение только для биглей */}
+      {(isSelected || hovered) && type === "beagle" && (
+        <pointLight
+          position={[0, 0.5, 0]}
+          intensity={isSelected ? 0.4 : 0.2}
+          color="#FFD700"
+          distance={1}
+        />
+      )}
     </group>
   );
 }
 
-// Предзагрузка моделей
+// Предзагрузка моделей для оптимизации
 useGLTF.preload("/models/beagle.glb");
 useGLTF.preload("/models/corgi.glb");
 useGLTF.preload("/models/crown.glb");
