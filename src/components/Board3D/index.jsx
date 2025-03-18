@@ -1,5 +1,5 @@
-import { Suspense, useState, useRef, useMemo } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Suspense, useState, useRef, useMemo, useEffect } from "react";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import {
   OrbitControls,
   PerspectiveCamera,
@@ -9,8 +9,6 @@ import {
   Cloud,
   Sky,
   Sparkles,
-  useHelper,
-  Shadow,
 } from "@react-three/drei";
 import { PieceMesh } from "./PieceMesh";
 import React from "react";
@@ -66,9 +64,24 @@ function Board({ renderBoardSquares }) {
   );
 }
 
-// Солнце с эффектом свечения
+// Обновление компонента Sun для поддержки режимов производительности
 function Sun() {
   const sunPosition = [100, 100, -100]; // Позиция солнца
+  const { performanceMode } = useThree((state) => ({
+    performanceMode: state.performance?.current,
+  }));
+
+  // Упрощенная версия для низкой производительности
+  if (performanceMode === "low") {
+    return (
+      <directionalLight
+        position={sunPosition}
+        intensity={3}
+        color="#FFFACD"
+        castShadow
+      />
+    );
+  }
 
   return (
     <group position={sunPosition}>
@@ -78,15 +91,17 @@ function Sun() {
         <meshBasicMaterial color="#FDB813" />
       </mesh>
 
-      {/* Внешнее свечение */}
-      <Sparkles
-        count={50}
-        scale={[30, 30, 30]}
-        size={6}
-        speed={0.3}
-        color="#FFFFE0"
-        opacity={0.7}
-      />
+      {/* Внешнее свечение - отключаем для режима medium */}
+      {performanceMode !== "medium" && (
+        <Sparkles
+          count={50}
+          scale={[30, 30, 30]}
+          size={6}
+          speed={0.3}
+          color="#FFFFE0"
+          opacity={0.7}
+        />
+      )}
 
       {/* Лучи света от солнца */}
       <directionalLight
@@ -94,8 +109,8 @@ function Sun() {
         intensity={3}
         color="#FFFACD"
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={performanceMode === "high" ? 2048 : 1024}
+        shadow-mapSize-height={performanceMode === "high" ? 2048 : 1024}
         shadow-camera-far={500}
         shadow-camera-left={-100}
         shadow-camera-right={100}
@@ -275,30 +290,110 @@ function EnhancedClouds({ count = 80 }) {
   return <group>{clouds}</group>;
 }
 
-// Компонент для реалистичного неба с динамическими облаками и солнцем
-function SkyWithCloudsAndSun() {
+// Обновление функции PerformanceMonitor
+function PerformanceMonitor({ onPerformanceChange }) {
+  const frameCount = useRef(0);
+  const lastTime = useRef(Date.now());
+  const fps = useRef(60);
+  const lastReportedMode = useRef("high");
+
+  useFrame(() => {
+    frameCount.current++;
+
+    const now = Date.now();
+    const elapsed = now - lastTime.current;
+
+    // Обновляем FPS каждые 500мс для более частого обновления интерфейса
+    if (elapsed > 500) {
+      fps.current = Math.round((frameCount.current / elapsed) * 1000);
+
+      // Определяем режим производительности
+      let newMode = "high";
+      if (fps.current < 20) {
+        newMode = "low";
+      } else if (fps.current < 40) {
+        newMode = "medium";
+      }
+
+      // Всегда сообщаем родительскому компоненту обновленные данные FPS
+      onPerformanceChange(fps.current, newMode);
+
+      // Обновляем последний режим только при его изменении
+      if (newMode !== lastReportedMode.current) {
+        lastReportedMode.current = newMode;
+      }
+
+      // Сбрасываем счетчик
+      frameCount.current = 0;
+      lastTime.current = now;
+    }
+  });
+
+  return null;
+}
+
+// Компонент неба с динамическими облаками и солнцем
+function SkyWithCloudsAndSun({ performanceMode }) {
   const skyRef = useRef();
 
+  // Если включен режим производительности, вернем минимальную версию неба
+  if (performanceMode === "low") {
+    return (
+      <>
+        {/* Простая цветная сфера заменяет небо */}
+        <mesh position={[0, 0, 0]} scale={500}>
+          <sphereGeometry args={[1, 16, 16]} />
+          <meshBasicMaterial color="#87CEEB" side={THREE.BackSide} />
+        </mesh>
+
+        {/* Упрощенный источник света вместо солнца */}
+        <directionalLight
+          position={[100, 100, -100]}
+          intensity={3}
+          color="#FFFACD"
+          castShadow
+        />
+      </>
+    );
+  }
+
+  // Средний режим - базовое небо без облаков
+  if (performanceMode === "medium") {
+    return (
+      <>
+        <Sky
+          ref={skyRef}
+          distance={450000}
+          sunPosition={[100, 100, -100]}
+          inclination={0.6}
+          azimuth={0.25}
+          rayleigh={0.15}
+          turbidity={6}
+          mieCoefficient={0.003}
+          mieDirectionalG={0.9}
+          exposure={1.5}
+        />
+        <Sun />
+      </>
+    );
+  }
+
+  // Полный режим с небом, солнцем и облаками
   return (
     <>
-      {/* Настраиваем голубое небо с правильными параметрами */}
       <Sky
         ref={skyRef}
         distance={450000}
-        sunPosition={[100, 100, -100]} // Совпадает с положением солнца
+        sunPosition={[100, 100, -100]}
         inclination={0.6}
         azimuth={0.25}
-        rayleigh={0.15} // Меньшее значение для более голубого неба
-        turbidity={6} // Меньше для более чистого неба
+        rayleigh={0.15}
+        turbidity={6}
         mieCoefficient={0.003}
         mieDirectionalG={0.9}
-        exposure={1.5} // Увеличиваем яркость
+        exposure={1.5}
       />
-
-      {/* Добавляем видимое солнце */}
       <Sun />
-
-      {/* Улучшенные облака */}
       <EnhancedClouds count={100} />
     </>
   );
@@ -336,8 +431,26 @@ function SimpleEnvironment() {
   );
 }
 
-export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
+// Обновление экспортируемого компонента
+export function Board3D({
+  board,
+  onPieceSelect,
+  selectedPiece,
+  validMoves,
+  onPerformanceData,
+}) {
   const [hoveredSquare, setHoveredSquare] = useState(null);
+  const [performanceMode, setPerformanceMode] = useState("high");
+
+  // Обработчик изменения производительности
+  const handlePerformanceChange = (fps, mode) => {
+    setPerformanceMode(mode);
+
+    // Передаем информацию родительскому компоненту при каждом обновлении FPS
+    if (onPerformanceData) {
+      onPerformanceData(fps, mode);
+    }
+  };
 
   // Рендеринг клеток доски с чётким шахматным узором
   const renderBoardSquares = () => {
@@ -486,8 +599,11 @@ export function Board3D({ board, onPieceSelect, selectedPiece, validMoves }) {
       <Renderer />
       <SimpleEnvironment />
 
-      {/* Улучшенный компонент неба с облаками и солнцем */}
-      <SkyWithCloudsAndSun />
+      {/* Добавляем монитор производительности */}
+      <PerformanceMonitor onPerformanceChange={handlePerformanceChange} />
+
+      {/* Используем наш адаптивный компонент неба */}
+      <SkyWithCloudsAndSun performanceMode={performanceMode} />
 
       <Suspense fallback={null}>
         <Board renderBoardSquares={renderBoardSquares} />

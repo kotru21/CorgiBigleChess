@@ -1,13 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Board3D } from "./Board3D";
 import { useGame } from "../contexts/GameContext.jsx";
 import { getValidMoves, executeMove } from "../services/MoveService";
-import {
-  movePiece,
-  checkGameStatus,
-  createInitialBoard,
-} from "../services/BoardService";
-import { PLAYER, BOT, PLAYER_KING, BOT_KING } from "../models/Constants";
+import { checkGameStatus, createInitialBoard } from "../services/BoardService";
+import { PLAYER, PLAYER_KING } from "../models/Constants";
 import { useBotAI } from "../hooks/useBotAI"; // Добавляем импорт хука для бота
 
 export function GameBoard({ onReturnToMenu }) {
@@ -28,6 +24,20 @@ export function GameBoard({ onReturnToMenu }) {
 
   // Подключаем AI бота
   const { makeBotMove } = useBotAI();
+
+  const [performanceMode, setPerformanceMode] = useState("high");
+  const [showFpsInfo, setShowFpsInfo] = useState(false);
+  const [currentFps, setCurrentFps] = useState(60); // Добавляем состояние для хранения текущего FPS
+
+  // Функция для получения данных о производительности от Board3D
+  const handlePerformanceData = (fps, mode) => {
+    setCurrentFps(fps); // Обновляем значение FPS в состоянии
+
+    // Обновляем режим производительности только при его изменении
+    if (mode !== performanceMode) {
+      setPerformanceMode(mode);
+    }
+  };
 
   // Выбор фигуры или ход
   const handlePieceSelect = (row, col) => {
@@ -136,6 +146,21 @@ export function GameBoard({ onReturnToMenu }) {
         {gameMessage}
       </div>
 
+      {/* Индикатор производительности - обновляем, чтобы отображать текущий FPS из состояния */}
+      <div
+        className="absolute mr-12 top-2 right-20 z-10 px-3 py-1 bg-black/40 backdrop-blur-sm rounded-md text-white font-medium cursor-pointer"
+        onClick={() => setShowFpsInfo(!showFpsInfo)}>
+        <span
+          className={`inline-block w-3 h-3 rounded-full mr-2 ${
+            performanceMode === "high"
+              ? "bg-green-500"
+              : performanceMode === "medium"
+              ? "bg-yellow-500"
+              : "bg-red-500"
+          }`}></span>
+        {showFpsInfo ? `${currentFps} FPS` : "Производительность"}
+      </div>
+
       {/* Кнопка возврата в меню - теперь использует переданную функцию */}
       <button
         onClick={onReturnToMenu}
@@ -157,6 +182,7 @@ export function GameBoard({ onReturnToMenu }) {
           onPieceSelect={handlePieceSelect}
           selectedPiece={selectedPiece}
           validMoves={validMoves}
+          onPerformanceData={handlePerformanceData}
         />
       </div>
 
